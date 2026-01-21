@@ -1,0 +1,69 @@
+# Discipline - Cat Food Bowl Guardian Configuration
+
+# Cat definitions
+cats:
+  abbi:
+    name: "Abbi"
+    allowed_bowl: "abbi"
+  ilana:
+    name: "Ilana"
+    allowed_bowl: "ilana"
+
+# Bowl positions in camera frame (pixels)
+# These will be calibrated using the calibration script
+bowls:
+  abbi:
+    x: 200
+    y: 300
+    radius: 100  # Detection zone radius
+  ilana:
+    x: 500
+    y: 300
+    radius: 100
+
+# Camera settings
+camera:
+  resolution:
+    width: 1280
+    height: 720
+  framerate: 30
+  rotation: 0  # 0, 90, 180, or 270 degrees
+
+# Cat detection settings
+detection:
+  confidence_threshold: 0.5  # Minimum confidence for cat detection
+  model: "yolov8n.pt"  # YOLOv8 nano model (fast)
+
+# Cat identification settings
+identification:
+  model_path: "models/cat_classifier.pkl"
+  confidence_threshold: 0.7  # Minimum confidence to identify specific cat
+
+# Spray settings
+spray:
+  gpio_pin: 17  # BCM pin number for relay control
+  duration_ms: 500  # Spray duration in milliseconds
+  cooldown_s: 10  # Minimum seconds between sprays
+  enabled: true  # Set to false to disable spraying (test mode)
+
+# Bowl monitoring logic
+monitoring:
+  # How long a cat must be at a bowl to be considered "eating"
+  eating_threshold_s: 2.0
+  # How long after a cat leaves before their bowl is "available"
+  leave_threshold_s: 5.0
+  # Distance from bowl center to be considered "at bowl" (pixels)
+  proximity_threshold: 150
+
+# Logging settings
+logging:
+  level: "INFO"
+  file: "logs/discipline.log"
+  max_size_mb: 10
+  backup_count: 5
+
+# Debug settings
+debug:
+  show_video: false  # Display video window (requires display)
+  save_detections: false  # Save images of detections
+  detections_dir: "logs/detections"

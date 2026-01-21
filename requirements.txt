@@ -1,0 +1,26 @@
+# Core dependencies
+numpy>=1.24.0
+opencv-python>=4.8.0
+Pillow>=10.0.0
+
+# Machine Learning
+ultralytics>=8.0.0  # YOLOv8 for cat detection
+torch>=2.0.0
+torchvision>=0.15.0
+scikit-learn>=1.3.0
+
+# Raspberry Pi specific (uncomment when running on Pi)
+# picamera2>=0.3.12
+# RPi.GPIO>=0.7.1
+# libcamera>=0.0.1
+
+# Configuration and utilities
+PyYAML>=6.0
+python-dotenv>=1.0.0
+
+# Logging and monitoring
+loguru>=0.7.0
+
+# Optional: Web dashboard
+# flask>=3.0.0
+# flask-socketio>=5.3.0

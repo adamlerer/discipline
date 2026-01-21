@@ -1,0 +1,19 @@
+[Unit]
+Description=Discipline Cat Food Bowl Guardian
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/discipline
+Environment=PATH=/home/pi/discipline/venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/pi/discipline/venv/bin/python -m discipline.main
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=append:/home/pi/discipline/logs/service.log
+StandardError=append:/home/pi/discipline/logs/service.log
+
+[Install]
+WantedBy=multi-user.target
