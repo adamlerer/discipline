@@ -50,6 +50,43 @@ Ilana keeps eating Abbi's food. This system watches the food bowls and sprays Il
 - **Pressure tank** - For more consistent spray pressure
 - **Flow sensor** - To monitor water usage
 
+## Shopping List (with Purchase Links)
+
+### Core Components
+
+| Component | Best Price | Amazon Alternative |
+|-----------|------------|-------------------|
+| **Raspberry Pi 4 (4GB)** | [$60 - Adafruit](https://www.adafruit.com/product/4296) | [CanaKit Starter Kit - Amazon](https://www.amazon.com/CanaKit-Raspberry-4GB-Starter-Kit/dp/B07V5JTMV9) |
+| **Pi Camera Module 3 Wide** | [$35 - Adafruit](https://www.adafruit.com/product/5658) | [Camera Module 3 Wide - Amazon](https://www.amazon.com/Raspberry-Pi-Camera-Module-Wide/dp/B0BRY757NX) |
+| **12V Solenoid Valve (1/4" NC)** | - | [DIGITEN 12V Solenoid - Amazon](https://www.amazon.com/DIGITEN-Solenoid-Connect-normally-Closed/dp/B016MP1HX0) |
+| **5V Relay Module (Opto-isolated)** | - | [HiLetgo 5V Relay - Amazon](https://www.amazon.com/HiLetgo-Channel-optocoupler-Support-Trigger/dp/B00LW15A4W) |
+| **12V 2A Power Supply** | - | [12V 2A Adapter - Amazon](https://www.amazon.com/Coming-Data-5-5x2-1mm-Connector-Certified/dp/B0194B7WSI) |
+| **USB-C Power Supply (5V 3A)** | - | [Raspberry Pi 4 Power Supply - Amazon](https://www.amazon.com/UCTRONICS-Raspberry-Supply-Charger-Adapter/dp/B08C9VYLLK) |
+| **Silicone Tubing (1/4" ID)** | - | [Food Grade Silicone Tubing 10ft - Amazon](https://www.amazon.com/Pure-Silicone-Tubing-High-Kink-Free/dp/B07QDKJ66Q) |
+| **Misting Nozzle Kit** | - | [Brass Misting Nozzles - Amazon](https://www.amazon.com/lifeegrn-Misting-Nozzles-Connectors-Outdoor/dp/B098F275FB) |
+| **Jumper Wires** | - | [120pcs Jumper Wire Kit - Amazon](https://www.amazon.com/Jumper-Female-Wire-Arduino-raspberry/dp/B01MT530B8) |
+| **Waterproof Enclosure** | [$9.95 - Adafruit](https://www.adafruit.com/product/3931) | [Sixfab IP65 Enclosure - Amazon](https://www.amazon.com/Outdoor-Enclosure-Raspberry-Development-Boards/dp/B09TRZ5BTB) |
+
+### Quick Links
+
+**Adafruit (often cheaper):**
+- [Raspberry Pi 4 4GB - $60](https://www.adafruit.com/product/4296)
+- [Camera Module 3 Wide - $35](https://www.adafruit.com/product/5658)
+- [Camera Module 3 Wide NoIR (for low light) - $35](https://www.adafruit.com/product/5660)
+- [Weatherproof Enclosure with Cable Glands](https://www.adafruit.com/product/3931)
+
+**Amazon (all-in-one shopping):**
+- [Raspberry Pi 4 4GB Board](https://www.amazon.com/Raspberry-Model-2019-Quad-Bluetooth/dp/B07TC2BK1X)
+- [Pi Camera Module 3 Wide](https://www.amazon.com/Raspberry-Pi-Camera-Module-Wide/dp/B0BRY757NX)
+- [DIGITEN 12V 1/4" Solenoid Valve](https://www.amazon.com/DIGITEN-Solenoid-Connect-normally-Closed/dp/B016MP1HX0)
+- [HiLetgo 5V Relay Module (2-pack)](https://www.amazon.com/HiLetgo-Channel-optocoupler-Support-Trigger/dp/B00LW15A4W)
+- [12V 2A DC Power Adapter (UL Certified)](https://www.amazon.com/Coming-Data-5-5x2-1mm-Connector-Certified/dp/B0194B7WSI)
+- [USB-C 5V 3A Power Supply with Switch](https://www.amazon.com/UCTRONICS-Raspberry-Supply-Charger-Adapter/dp/B08C9VYLLK)
+- [Pure Silicone Tubing 1/4" x 10ft](https://www.amazon.com/Pure-Silicone-Tubing-High-Kink-Free/dp/B07QDKJ66Q)
+- [Brass Misting Nozzle Kit](https://www.amazon.com/lifeegrn-Misting-Nozzles-Connectors-Outdoor/dp/B098F275FB)
+- [Jumper Wires Kit (120pcs M/F/M-M/F-F)](https://www.amazon.com/Jumper-Female-Wire-Arduino-raspberry/dp/B01MT530B8)
+- [Sixfab IP65 Outdoor Enclosure](https://www.amazon.com/Outdoor-Enclosure-Raspberry-Development-Boards/dp/B09TRZ5BTB)
+
 ## Wiring Diagram
 
 ```
