@@ -72,16 +72,39 @@ class CatDetector:
         self.model = None
         self._ort_session = None
 
-        # Try PyTorch first, fall back to ONNX
-        try:
-            from ultralytics import YOLO
-            self.model = YOLO(model_path)
-            if device:
-                self.model.to(device)
-        except Exception as e:
-            print(f"PyTorch not available ({e}), using ONNX Runtime")
+        # Check if PyTorch works before trying ultralytics
+        pytorch_available = self._check_pytorch()
+
+        if pytorch_available:
+            try:
+                from ultralytics import YOLO
+                self.model = YOLO(model_path)
+                if device:
+                    self.model.to(device)
+            except Exception as e:
+                print(f"Failed to load ultralytics ({e}), using ONNX Runtime")
+                self._use_onnx = True
+                self._init_onnx(model_path)
+        else:
+            print("PyTorch not available, using ONNX Runtime")
             self._use_onnx = True
             self._init_onnx(model_path)
+
+    def _check_pytorch(self) -> bool:
+        """Check if PyTorch is available and working."""
+        try:
+            import subprocess
+            import sys
+            # Run a quick test in a subprocess to avoid crashing the main process
+            result = subprocess.run(
+                [sys.executable, "-c", "import torch; print('ok')"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            return result.returncode == 0 and "ok" in result.stdout
+        except Exception:
+            return False
 
     def _init_onnx(self, model_path: str) -> None:
         """Initialize ONNX Runtime session."""
