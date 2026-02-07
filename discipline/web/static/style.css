@@ -76,7 +76,14 @@ section h2 {
     grid-row: 1 / 3;
 }
 
+.video-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
 .video-container {
+    position: relative;
     background-color: #000;
     border-radius: 8px;
     overflow: hidden;
@@ -87,6 +94,89 @@ section h2 {
     width: 100%;
     height: 100%;
     object-fit: contain;
+}
+
+.bowl-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.bowl-overlay.editing {
+    pointer-events: auto;
+}
+
+.bowl-group {
+    cursor: default;
+}
+
+.bowl-group.editable {
+    cursor: move;
+    pointer-events: auto;
+}
+
+.bowl-circle {
+    fill: none;
+    stroke-width: 3;
+}
+
+.bowl-circle.abbi {
+    stroke: #22c55e;
+}
+
+.bowl-circle.ilana {
+    stroke: #3b82f6;
+}
+
+.bowl-group.editable .bowl-circle {
+    stroke-width: 4;
+    stroke-dasharray: 8 4;
+}
+
+.bowl-group.editable .bowl-circle.abbi {
+    fill: rgba(34, 197, 94, 0.1);
+}
+
+.bowl-group.editable .bowl-circle.ilana {
+    fill: rgba(59, 130, 246, 0.1);
+}
+
+.bowl-label {
+    fill: white;
+    font-size: 14px;
+    font-weight: bold;
+    text-shadow: 0 0 4px black, 0 0 4px black;
+}
+
+.bowl-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 10px 15px;
+    background-color: var(--bg-lighter);
+    border-radius: 8px;
+}
+
+.edit-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.edit-toggle input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.bowl-edit-hint {
+    color: var(--accent-yellow);
+    font-size: 0.85rem;
 }
 
 /* Controls Panel */

@@ -433,10 +433,14 @@ class DisciplineSystem:
             for bowl_name, bowl in self.monitor.bowls.items():
                 color = (0, 255, 0) if bowl_name == "abbi" else (255, 0, 0)
                 cv2.circle(annotated, (bowl.x, bowl.y), bowl.radius, color, 2)
+                label = f"{bowl_name.upper()} BOWL"
+                # Center the label above the bowl
+                text_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+                text_x = bowl.x - text_size[0] // 2
                 cv2.putText(
                     annotated,
-                    bowl_name.upper(),
-                    (bowl.x - 30, bowl.y - bowl.radius - 10),
+                    label,
+                    (text_x, bowl.y - bowl.radius - 10),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.7,
                     color,
@@ -487,6 +491,53 @@ class DisciplineSystem:
             "cats_config": self.config.get("cats", {}),
             "bowls_config": self.config.get("bowls", {}),
         }
+
+    def get_bowl_positions(self) -> dict:
+        """Get current bowl positions."""
+        return self.config.get("bowls", {})
+
+    def update_bowl_position(self, bowl_name: str, x: int, y: int, radius: int) -> bool:
+        """
+        Update a bowl's position and save to config.
+
+        Args:
+            bowl_name: "abbi" or "ilana"
+            x: Center x coordinate
+            y: Center y coordinate
+            radius: Detection zone radius
+
+        Returns:
+            True if successful
+        """
+        if bowl_name not in ("abbi", "ilana"):
+            return False
+
+        # Update in-memory config
+        if "bowls" not in self.config:
+            self.config["bowls"] = {}
+        if bowl_name not in self.config["bowls"]:
+            self.config["bowls"][bowl_name] = {}
+
+        self.config["bowls"][bowl_name]["x"] = x
+        self.config["bowls"][bowl_name]["y"] = y
+        self.config["bowls"][bowl_name]["radius"] = radius
+
+        # Update the bowl monitor if it exists
+        if self.monitor and bowl_name in self.monitor.bowls:
+            self.monitor.bowls[bowl_name].x = x
+            self.monitor.bowls[bowl_name].y = y
+            self.monitor.bowls[bowl_name].radius = radius
+
+        # Save to config file
+        self._save_config()
+
+        self.logger.info(f"Updated bowl position: {bowl_name} at ({x}, {y}) radius {radius}")
+        return True
+
+    def _save_config(self) -> None:
+        """Save current config to file."""
+        with open(self.config_path, "w") as f:
+            yaml.dump(self.config, f, default_flow_style=False, sort_keys=False)
 
     def _capture_for_labeling(
         self,
@@ -655,10 +706,13 @@ class DisciplineSystem:
         for bowl_name, bowl in self.monitor.bowls.items():
             color = (0, 255, 0) if bowl_name == "abbi" else (255, 0, 0)
             cv2.circle(display, (bowl.x, bowl.y), bowl.radius, color, 2)
+            label = f"{bowl_name.upper()} BOWL"
+            text_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+            text_x = bowl.x - text_size[0] // 2
             cv2.putText(
                 display,
-                bowl_name.upper(),
-                (bowl.x - 30, bowl.y - bowl.radius - 10),
+                label,
+                (text_x, bowl.y - bowl.radius - 10),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
                 color,

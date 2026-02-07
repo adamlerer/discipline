@@ -16,8 +16,20 @@
         <main>
             <section class="video-panel">
                 <h2>Live View</h2>
-                <div class="video-container">
-                    <img id="video-stream" src="/video_feed" alt="Live camera feed">
+                <div class="video-wrapper">
+                    <div class="video-container" id="video-container">
+                        <img id="video-stream" src="/video_feed" alt="Live camera feed">
+                        <svg id="bowl-overlay" class="bowl-overlay"></svg>
+                    </div>
+                    <div class="bowl-controls">
+                        <label class="edit-toggle">
+                            <input type="checkbox" id="edit-bowls-toggle" onchange="toggleBowlEdit(this.checked)">
+                            <span>Edit Bowl Positions</span>
+                        </label>
+                        <span id="bowl-edit-hint" class="bowl-edit-hint" style="display: none;">
+                            Drag to move, scroll to resize
+                        </span>
+                    </div>
                 </div>
             </section>
 
@@ -144,6 +156,12 @@
         let unlabeledImages = [];
         let currentImageIndex = 0;
 
+        // Bowl editing state
+        let bowlEditMode = false;
+        let bowls = {};
+        let draggingBowl = null;
+        let dragOffset = { x: 0, y: 0 };
+
         // Update status every 2 seconds
         setInterval(updateStatus, 2000);
         // Update events every 5 seconds
@@ -156,6 +174,7 @@
         updateEvents();
         updateLabelingStats();
         updateLabelingImages();
+        loadBowlPositions();
 
         // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {
@@ -506,6 +525,171 @@
             currentImageIndex = (currentImageIndex + 1) % unlabeledImages.length;
             updateLabelingUI();
         }
+
+        // Bowl editing functions
+        async function loadBowlPositions() {
+            try {
+                const response = await fetch('/api/bowls');
+                bowls = await response.json();
+                renderBowlOverlay();
+            } catch (error) {
+                console.error('Failed to load bowl positions:', error);
+            }
+        }
+
+        function renderBowlOverlay() {
+            const overlay = document.getElementById('bowl-overlay');
+            const container = document.getElementById('video-container');
+            const video = document.getElementById('video-stream');
+
+            // Match overlay size to video
+            const rect = video.getBoundingClientRect();
+            overlay.setAttribute('width', rect.width);
+            overlay.setAttribute('height', rect.height);
+
+            // Calculate scale from actual video resolution (1280x720) to displayed size
+            const scaleX = rect.width / 1280;
+            const scaleY = rect.height / 720;
+
+            overlay.innerHTML = '';
+
+            for (const [name, bowl] of Object.entries(bowls)) {
+                const scaledX = bowl.x * scaleX;
+                const scaledY = bowl.y * scaleY;
+                const scaledRadius = bowl.radius * Math.min(scaleX, scaleY);
+
+                const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                group.setAttribute('data-bowl', name);
+                group.classList.add('bowl-group');
+                if (bowlEditMode) group.classList.add('editable');
+
+                // Circle
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', scaledX);
+                circle.setAttribute('cy', scaledY);
+                circle.setAttribute('r', scaledRadius);
+                circle.classList.add('bowl-circle');
+                circle.classList.add(name === 'abbi' ? 'abbi' : 'ilana');
+
+                // Label
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', scaledX);
+                text.setAttribute('y', scaledY - scaledRadius - 10);
+                text.setAttribute('text-anchor', 'middle');
+                text.classList.add('bowl-label');
+                text.textContent = name.toUpperCase() + ' BOWL';
+
+                group.appendChild(circle);
+                group.appendChild(text);
+                overlay.appendChild(group);
+
+                // Add event listeners for editing
+                if (bowlEditMode) {
+                    group.addEventListener('mousedown', (e) => startDragBowl(e, name));
+                    group.addEventListener('wheel', (e) => resizeBowl(e, name));
+                }
+            }
+        }
+
+        function toggleBowlEdit(enabled) {
+            bowlEditMode = enabled;
+            document.getElementById('bowl-edit-hint').style.display = enabled ? 'inline' : 'none';
+            document.getElementById('video-stream').style.display = enabled ? 'none' : 'block';
+
+            // When in edit mode, show a static frame instead of video stream
+            if (enabled) {
+                // Capture current frame as static image
+                const video = document.getElementById('video-stream');
+                video.style.display = 'none';
+            } else {
+                const video = document.getElementById('video-stream');
+                video.style.display = 'block';
+            }
+
+            renderBowlOverlay();
+        }
+
+        function startDragBowl(e, bowlName) {
+            if (!bowlEditMode) return;
+            e.preventDefault();
+
+            draggingBowl = bowlName;
+            const overlay = document.getElementById('bowl-overlay');
+            const rect = overlay.getBoundingClientRect();
+            const scaleX = rect.width / 1280;
+            const scaleY = rect.height / 720;
+
+            dragOffset.x = e.clientX - (bowls[bowlName].x * scaleX);
+            dragOffset.y = e.clientY - (bowls[bowlName].y * scaleY);
+
+            document.addEventListener('mousemove', dragBowl);
+            document.addEventListener('mouseup', stopDragBowl);
+        }
+
+        function dragBowl(e) {
+            if (!draggingBowl) return;
+
+            const overlay = document.getElementById('bowl-overlay');
+            const rect = overlay.getBoundingClientRect();
+            const scaleX = rect.width / 1280;
+            const scaleY = rect.height / 720;
+
+            const newX = Math.round((e.clientX - dragOffset.x) / scaleX);
+            const newY = Math.round((e.clientY - dragOffset.y) / scaleY);
+
+            // Clamp to video bounds
+            bowls[draggingBowl].x = Math.max(0, Math.min(1280, newX));
+            bowls[draggingBowl].y = Math.max(0, Math.min(720, newY));
+
+            renderBowlOverlay();
+        }
+
+        function stopDragBowl() {
+            if (draggingBowl) {
+                saveBowlPosition(draggingBowl);
+                draggingBowl = null;
+            }
+            document.removeEventListener('mousemove', dragBowl);
+            document.removeEventListener('mouseup', stopDragBowl);
+        }
+
+        function resizeBowl(e, bowlName) {
+            if (!bowlEditMode) return;
+            e.preventDefault();
+
+            const delta = e.deltaY > 0 ? -10 : 10;
+            bowls[bowlName].radius = Math.max(20, Math.min(300, bowls[bowlName].radius + delta));
+
+            renderBowlOverlay();
+            saveBowlPosition(bowlName);
+        }
+
+        async function saveBowlPosition(bowlName) {
+            try {
+                const bowl = bowls[bowlName];
+                const response = await fetch(`/api/bowls/${bowlName}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        x: bowl.x,
+                        y: bowl.y,
+                        radius: bowl.radius
+                    })
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    showToast('Failed to save bowl position');
+                }
+            } catch (error) {
+                console.error('Failed to save bowl position:', error);
+                showToast('Failed to save bowl position');
+            }
+        }
+
+        // Re-render bowl overlay when window resizes
+        window.addEventListener('resize', () => {
+            renderBowlOverlay();
+        });
     </script>
 </body>
 </html>

@@ -200,6 +200,39 @@ class DisciplineWebApp:
             stats = self.system.get_labeling_stats()
             return jsonify(stats)
 
+        # Bowl configuration endpoints
+        @self._app.route("/api/bowls")
+        def api_bowls():
+            """Get bowl positions."""
+            bowls = self.system.get_bowl_positions()
+            return jsonify(bowls)
+
+        @self._app.route("/api/bowls/<bowl_name>", methods=["POST"])
+        def api_update_bowl(bowl_name: str):
+            """Update a bowl's position."""
+            data = request.get_json() or {}
+            x = data.get("x")
+            y = data.get("y")
+            radius = data.get("radius")
+
+            if x is None or y is None or radius is None:
+                return jsonify({
+                    "success": False,
+                    "error": "Missing x, y, or radius",
+                }), 400
+
+            success = self.system.update_bowl_position(
+                bowl_name,
+                int(x),
+                int(y),
+                int(radius),
+            )
+
+            return jsonify({
+                "success": success,
+                "message": f"Updated {bowl_name} bowl" if success else "Invalid bowl name",
+            })
+
     def _generate_frames(self) -> Generator[bytes, None, None]:
         """Generate MJPEG frames for video streaming."""
         while self._running and self.system._running:
