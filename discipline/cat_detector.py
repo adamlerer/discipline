@@ -49,8 +49,8 @@ class CatDetector:
     # YOLOv8n input size
     INPUT_SIZE = 640
 
-    # URL for pre-exported ONNX model
-    ONNX_MODEL_URL = "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.onnx"
+    # URL for pre-exported ONNX model (from Kalray's HuggingFace repo)
+    ONNX_MODEL_URL = "https://huggingface.co/Kalray/yolov8/resolve/main/yolov8n.onnx"
 
     def __init__(
         self,
