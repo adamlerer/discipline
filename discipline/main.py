@@ -5,9 +5,13 @@ Ties together all components: camera, detection, identification,
 bowl monitoring, and sprayer control.
 """
 
+import os
 import signal
 import sys
+import threading
 import time
+import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -20,6 +24,7 @@ from .camera import Camera
 from .cat_detector import CatDetector
 from .cat_identifier import CatIdentifier
 from .logger import DisciplineLogger
+from .sound_player import SoundPlayer
 from .sprayer import Sprayer
 
 
@@ -53,17 +58,44 @@ class DisciplineSystem:
         self.identifier: Optional[CatIdentifier] = None
         self.monitor: Optional[BowlMonitor] = None
         self.sprayer: Optional[Sprayer] = None
+        self.sound_player: Optional[SoundPlayer] = None
+        self.web_app = None  # Will be DisciplineWebApp if enabled
 
         # Runtime state
         self._running = False
         self._frame_count = 0
         self._start_time: Optional[float] = None
 
+        # Runtime toggles (can override config during runtime)
+        self._spray_enabled: Optional[bool] = None  # None = use config default
+        self._sound_enabled: Optional[bool] = None  # None = use config default
+
+        # Store current frame and detections for web streaming
+        self._current_frame: Optional[np.ndarray] = None
+        self._current_detections: list = []
+        self._frame_lock = threading.Lock()
+
+        # Event log for web interface
+        self._recent_events: list = []
+        self._max_events = 100
+
         # Debug settings
         debug_cfg = self.config.get("debug", {})
         self.show_video = debug_cfg.get("show_video", False)
         self.save_detections = debug_cfg.get("save_detections", False)
         self.detections_dir = Path(debug_cfg.get("detections_dir", "logs/detections"))
+
+        # Labeling settings
+        labeling_cfg = self.config.get("labeling", {})
+        self._labeling_enabled = labeling_cfg.get("enabled", False)
+        self._capture_interval_s = labeling_cfg.get("capture_interval_s", 1.0)
+        self._max_unlabeled = labeling_cfg.get("max_unlabeled", 500)
+        self._min_detection_confidence = labeling_cfg.get("min_detection_confidence", 0.6)
+        self._last_capture_time = 0.0
+
+        # Data directories for labeling
+        self._unlabeled_dir = Path("data/unlabeled")
+        self._training_dir = Path("data/training")
 
     def _load_config(self) -> dict:
         """Load configuration from YAML file."""
@@ -127,9 +159,44 @@ class DisciplineSystem:
             enabled=spray_cfg.get("enabled", True),
         )
 
+        # Sound player
+        sound_cfg = self.config.get("sound", {})
+        if sound_cfg.get("enabled", False):
+            self.sound_player = SoundPlayer(
+                sound_file=sound_cfg.get("file", "sounds/deterrent.mp3"),
+                volume=sound_cfg.get("volume", 0.7),
+                duration_ms=sound_cfg.get("duration_ms", 2000),
+                cooldown_s=sound_cfg.get("cooldown_s", 5),
+                enabled=True,
+            )
+            self.sound_player.initialize()
+            self.logger.info("Sound player initialized")
+
+        # Web app
+        web_cfg = self.config.get("web", {})
+        if web_cfg.get("enabled", False):
+            from .web.app import DisciplineWebApp
+
+            self.web_app = DisciplineWebApp(
+                system=self,
+                host=web_cfg.get("host", "0.0.0.0"),
+                port=web_cfg.get("port", 5000),
+            )
+            self.web_app.start()
+            self.logger.info(
+                f"Web interface started at http://{web_cfg.get('host', '0.0.0.0')}:{web_cfg.get('port', 5000)}"
+            )
+
         # Create detections directory if saving
         if self.save_detections:
             self.detections_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create labeling directories if enabled
+        if self._labeling_enabled:
+            self._unlabeled_dir.mkdir(parents=True, exist_ok=True)
+            (self._training_dir / "abbi").mkdir(parents=True, exist_ok=True)
+            (self._training_dir / "ilana").mkdir(parents=True, exist_ok=True)
+            self.logger.info("Labeling enabled - capturing cat images for training")
 
         self.logger.info("System initialized successfully")
 
@@ -194,59 +261,390 @@ class DisciplineSystem:
         # Detect cats
         detections = self.detector.detect(frame)
 
-        if not detections:
-            return
-
         # Identify each detected cat
         identified = []
-        for detection in detections:
-            # Crop cat from frame
-            cat_image = detection.crop_from(frame)
+        if detections:
+            for detection in detections:
+                # Crop cat from frame
+                cat_image = detection.crop_from(frame)
 
-            # Identify which cat it is
-            identification = self.identifier.identify(cat_image)
+                # Identify which cat it is
+                identification = self.identifier.identify(cat_image)
 
-            identified.append((detection, identification))
+                identified.append((detection, identification))
 
-            # Log detection
-            bowl_at = None
-            for bowl_name, bowl in self.monitor.bowls.items():
-                if bowl.contains_point(detection.center):
-                    bowl_at = bowl_name
-                    break
+                # Log detection
+                bowl_at = None
+                for bowl_name, bowl in self.monitor.bowls.items():
+                    if bowl.contains_point(detection.center):
+                        bowl_at = bowl_name
+                        break
 
-            self.logger.log_detection(
-                cat_name=identification.cat_name,
-                confidence=identification.confidence,
-                position=detection.center,
-                bowl=bowl_at,
-            )
+                self.logger.log_detection(
+                    cat_name=identification.cat_name,
+                    confidence=identification.confidence,
+                    position=detection.center,
+                    bowl=bowl_at,
+                )
+
+        # Store current frame and detections for web streaming
+        with self._frame_lock:
+            self._current_frame = frame.copy()
+            self._current_detections = identified.copy()
+
+        # Capture images for labeling if enabled
+        if self._labeling_enabled and detections:
+            self._capture_for_labeling(frame, identified)
+
+        if not detections:
+            return
 
         # Update bowl monitor and check for violations
         violations = self.monitor.update(identified)
 
         # Handle violations
         for violation in violations:
-            should_spray = self.monitor.should_spray(violation)
+            should_deter = self.monitor.should_spray(violation)
+
+            # Check runtime toggle for spray
+            spray_enabled = self._spray_enabled if self._spray_enabled is not None else self.sprayer.enabled
+            # Check runtime toggle for sound
+            sound_enabled = self._sound_enabled if self._sound_enabled is not None else (
+                self.sound_player.enabled if self.sound_player else False
+            )
+
+            sprayed = False
+            sounded = False
 
             self.logger.log_violation(
                 cat_name=violation.cat_name,
                 bowl_name=violation.bowl_name,
                 owner_present=violation.owner_present,
-                sprayed=should_spray,
+                sprayed=should_deter and spray_enabled,
             )
 
-            if should_spray and self.sprayer.can_spray():
+            # Trigger spray if enabled
+            if should_deter and spray_enabled and self.sprayer.can_spray():
                 self.sprayer.spray()
+                sprayed = True
                 self.logger.log_spray(
                     cat_name=violation.cat_name,
                     bowl_name=violation.bowl_name,
                     duration_ms=self.sprayer.duration_ms,
                 )
 
+            # Trigger sound if enabled
+            if should_deter and sound_enabled and self.sound_player and self.sound_player.can_play():
+                self.sound_player.play()
+                sounded = True
+                self.logger.log_sound(
+                    cat_name=violation.cat_name,
+                    bowl_name=violation.bowl_name,
+                    duration_ms=self.sound_player.duration_ms,
+                )
+
+            # Add to recent events for web interface
+            self._add_event({
+                "type": "violation",
+                "cat": violation.cat_name,
+                "bowl": violation.bowl_name,
+                "owner_present": violation.owner_present,
+                "sprayed": sprayed,
+                "sounded": sounded,
+            })
+
         # Save detection image if configured
         if self.save_detections and detections:
             self._save_detection_image(frame, identified)
+
+    def _add_event(self, event: dict) -> None:
+        """Add an event to the recent events log."""
+        event["timestamp"] = datetime.now().isoformat()
+        self._recent_events.insert(0, event)
+        # Keep only the most recent events
+        if len(self._recent_events) > self._max_events:
+            self._recent_events = self._recent_events[: self._max_events]
+
+    def set_spray_enabled(self, enabled: bool) -> None:
+        """Set runtime spray enabled state."""
+        self._spray_enabled = enabled
+        self.logger.log_deterrent_toggle("spray", enabled, source="web")
+        self._add_event({
+            "type": "toggle",
+            "deterrent": "spray",
+            "enabled": enabled,
+        })
+
+    def set_sound_enabled(self, enabled: bool) -> None:
+        """Set runtime sound enabled state."""
+        self._sound_enabled = enabled
+        self.logger.log_deterrent_toggle("sound", enabled, source="web")
+        self._add_event({
+            "type": "toggle",
+            "deterrent": "sound",
+            "enabled": enabled,
+        })
+
+    def get_spray_enabled(self) -> bool:
+        """Get current spray enabled state."""
+        if self._spray_enabled is not None:
+            return self._spray_enabled
+        return self.sprayer.enabled if self.sprayer else False
+
+    def get_sound_enabled(self) -> bool:
+        """Get current sound enabled state."""
+        if self._sound_enabled is not None:
+            return self._sound_enabled
+        return self.sound_player.enabled if self.sound_player else False
+
+    def get_deterrent_state(self) -> dict:
+        """Get current deterrent state for web API."""
+        return {
+            "spray": {
+                "enabled": self.get_spray_enabled(),
+                "stats": self.sprayer.get_stats() if self.sprayer else {},
+            },
+            "sound": {
+                "enabled": self.get_sound_enabled(),
+                "stats": self.sound_player.get_stats() if self.sound_player else {},
+                "available": self.sound_player is not None,
+            },
+        }
+
+    def get_annotated_frame(self) -> Optional[np.ndarray]:
+        """
+        Get the current frame with bounding boxes and cat labels.
+
+        Returns:
+            Annotated frame in BGR format for MJPEG streaming, or None
+        """
+        with self._frame_lock:
+            if self._current_frame is None:
+                return None
+
+            frame = self._current_frame.copy()
+            detections = self._current_detections.copy()
+
+        # Convert to BGR for OpenCV
+        annotated = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+        # Draw bowl zones
+        if self.monitor:
+            for bowl_name, bowl in self.monitor.bowls.items():
+                color = (0, 255, 0) if bowl_name == "abbi" else (255, 0, 0)
+                cv2.circle(annotated, (bowl.x, bowl.y), bowl.radius, color, 2)
+                cv2.putText(
+                    annotated,
+                    bowl_name.upper(),
+                    (bowl.x - 30, bowl.y - bowl.radius - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    color,
+                    2,
+                )
+
+        # Draw bounding boxes for detected cats
+        for detection, identification in detections:
+            x1, y1, x2, y2 = detection.bbox
+            # Color based on cat identity
+            if identification.cat_name == "abbi":
+                color = (0, 255, 0)  # Green for Abbi
+            elif identification.cat_name == "ilana":
+                color = (255, 0, 0)  # Blue for Ilana (BGR)
+            else:
+                color = (0, 255, 255)  # Yellow for unknown
+
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
+            label = f"{identification.cat_name} ({identification.confidence:.0%})"
+            cv2.putText(
+                annotated,
+                label,
+                (x1, y1 - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                color,
+                2,
+            )
+
+        return annotated
+
+    def get_recent_events(self, limit: int = 50) -> list:
+        """Get recent events for web interface."""
+        return self._recent_events[:limit]
+
+    def get_system_status(self) -> dict:
+        """Get full system status for web API."""
+        runtime = 0
+        if self._start_time:
+            runtime = time.time() - self._start_time
+
+        return {
+            "running": self._running,
+            "runtime_s": round(runtime, 1),
+            "frames_processed": self._frame_count,
+            "violations_detected": len(self.monitor.violations) if self.monitor else 0,
+            "deterrents": self.get_deterrent_state(),
+            "cats_config": self.config.get("cats", {}),
+            "bowls_config": self.config.get("bowls", {}),
+        }
+
+    def _capture_for_labeling(
+        self,
+        frame: np.ndarray,
+        identified: list,
+    ) -> None:
+        """
+        Capture cropped cat images for labeling.
+
+        Args:
+            frame: RGB image from camera
+            identified: List of (detection, identification) tuples
+        """
+        current_time = time.time()
+
+        # Check if enough time has passed since last capture
+        if current_time - self._last_capture_time < self._capture_interval_s:
+            return
+
+        for detection, identification in identified:
+            # Only capture if detection confidence is high enough
+            if detection.confidence < self._min_detection_confidence:
+                continue
+
+            # Crop cat from frame
+            cat_image = detection.crop_from(frame)
+
+            # Generate unique filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            detection_id = str(uuid.uuid4())[:8]
+            filename = f"{timestamp}_{detection_id}.jpg"
+            filepath = self._unlabeled_dir / filename
+
+            # Convert to BGR and save
+            cv2.imwrite(str(filepath), cv2.cvtColor(cat_image, cv2.COLOR_RGB2BGR))
+            self._last_capture_time = current_time
+
+            self.logger.debug(f"Captured image for labeling: {filename}")
+
+        # Prune old images if over max
+        self._prune_unlabeled_images()
+
+    def _prune_unlabeled_images(self) -> None:
+        """Remove oldest unlabeled images if over max limit."""
+        if not self._unlabeled_dir.exists():
+            return
+
+        images = sorted(
+            self._unlabeled_dir.glob("*.jpg"),
+            key=lambda p: p.stat().st_mtime,
+        )
+
+        while len(images) > self._max_unlabeled:
+            oldest = images.pop(0)
+            oldest.unlink()
+            self.logger.debug(f"Pruned old unlabeled image: {oldest.name}")
+
+    def get_unlabeled_images(self) -> list:
+        """
+        Get list of unlabeled images with metadata.
+
+        Returns:
+            List of dicts with filename and timestamp
+        """
+        if not self._unlabeled_dir.exists():
+            return []
+
+        images = []
+        for filepath in sorted(
+            self._unlabeled_dir.glob("*.jpg"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,  # Most recent first
+        ):
+            stat = filepath.stat()
+            images.append({
+                "filename": filepath.name,
+                "timestamp": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "size": stat.st_size,
+            })
+
+        return images
+
+    def label_image(self, filename: str, cat_name: str) -> bool:
+        """
+        Move an image from unlabeled to the appropriate training folder.
+
+        Args:
+            filename: Name of the image file
+            cat_name: "abbi" or "ilana"
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if cat_name not in ("abbi", "ilana"):
+            return False
+
+        source = self._unlabeled_dir / filename
+        if not source.exists():
+            return False
+
+        dest_dir = self._training_dir / cat_name
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / filename
+
+        source.rename(dest)
+        self.logger.info(f"Labeled image {filename} as {cat_name}")
+        return True
+
+    def skip_image(self, filename: str) -> bool:
+        """
+        Delete an unlabeled image (skip it).
+
+        Args:
+            filename: Name of the image file
+
+        Returns:
+            True if successful, False otherwise
+        """
+        filepath = self._unlabeled_dir / filename
+        if not filepath.exists():
+            return False
+
+        filepath.unlink()
+        self.logger.debug(f"Skipped image: {filename}")
+        return True
+
+    def get_labeling_stats(self) -> dict:
+        """
+        Get counts of unlabeled and labeled images.
+
+        Returns:
+            Dict with counts for unlabeled, abbi, ilana
+        """
+        unlabeled_count = len(list(self._unlabeled_dir.glob("*.jpg"))) if self._unlabeled_dir.exists() else 0
+        abbi_count = len(list((self._training_dir / "abbi").glob("*.jpg"))) if (self._training_dir / "abbi").exists() else 0
+        ilana_count = len(list((self._training_dir / "ilana").glob("*.jpg"))) if (self._training_dir / "ilana").exists() else 0
+
+        return {
+            "unlabeled": unlabeled_count,
+            "abbi": abbi_count,
+            "ilana": ilana_count,
+            "enabled": self._labeling_enabled,
+        }
+
+    def get_unlabeled_image_path(self, filename: str) -> Optional[Path]:
+        """
+        Get the full path to an unlabeled image.
+
+        Args:
+            filename: Name of the image file
+
+        Returns:
+            Path to the image or None if not found
+        """
+        filepath = self._unlabeled_dir / filename
+        if filepath.exists():
+            return filepath
+        return None
 
     def _show_debug_frame(self, frame: np.ndarray) -> None:
         """Display frame with debug overlays."""
@@ -334,6 +732,7 @@ class DisciplineSystem:
             "frames_processed": self._frame_count,
             "violations_detected": len(self.monitor.violations) if self.monitor else 0,
             "sprays_triggered": self.sprayer.spray_count if self.sprayer else 0,
+            "sounds_triggered": self.sound_player.play_count if self.sound_player else 0,
         }
 
         self.logger.log_shutdown(stats)
@@ -344,6 +743,12 @@ class DisciplineSystem:
 
         if self.sprayer:
             self.sprayer.cleanup()
+
+        if self.sound_player:
+            self.sound_player.cleanup()
+
+        if self.web_app:
+            self.web_app.stop()
 
         if self.show_video:
             cv2.destroyAllWindows()

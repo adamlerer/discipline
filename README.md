@@ -20,7 +20,7 @@ Ilana keeps eating Abbi's food. This system watches the food bowls and sprays Il
 
 | Component | Description | Approximate Cost |
 |-----------|-------------|------------------|
-| Raspberry Pi 4 (4GB+) | Main controller running the vision system | $55-75 |
+| Raspberry Pi 4 (2GB or 4GB) | Main controller running the vision system | $45-75 |
 | Raspberry Pi Camera Module 3 | Wide-angle camera for monitoring | $25-35 |
 | 12V Solenoid Valve (normally closed) | Controls water flow | $10-15 |
 | 5V Relay Module | Switches the solenoid valve | $5-8 |
@@ -208,6 +208,51 @@ sudo systemctl enable discipline
 sudo systemctl start discipline
 ```
 
+### 7. Optional: Sound Deterrent
+
+In addition to the water spray, you can enable a sound deterrent.
+
+```bash
+# Install audio support
+pip install pygame
+
+# Add a sound file (MP3 or WAV)
+cp /path/to/your/sound.mp3 sounds/deterrent.mp3
+```
+
+Enable in `config.yaml`:
+```yaml
+sound:
+  file: "sounds/deterrent.mp3"
+  volume: 0.7
+  duration_ms: 2000
+  cooldown_s: 5
+  enabled: true
+```
+
+### 8. Optional: Web Admin Interface
+
+Enable a web dashboard for live video streaming and remote control.
+
+```bash
+# Install web dependencies
+pip install flask
+```
+
+Enable in `config.yaml`:
+```yaml
+web:
+  enabled: true
+  host: "0.0.0.0"
+  port: 5000
+```
+
+Then access the dashboard at `http://<pi-ip>:5000`. Features include:
+- Live video stream with cat identification overlays
+- Toggle spray/sound deterrents on/off
+- Test buttons for spray and sound
+- Real-time system status and event log
+
 ## Project Structure
 
 ```
@@ -223,13 +268,22 @@ discipline/
 │   ├── cat_identifier.py    # Identifies Abbi vs Ilana
 │   ├── bowl_monitor.py      # Tracks cats at bowls
 │   ├── sprayer.py           # Controls water sprayer
-│   └── logger.py            # Event logging
+│   ├── sound_player.py      # Sound deterrent playback
+│   ├── logger.py            # Event logging
+│   └── web/
+│       ├── __init__.py
+│       ├── app.py           # Flask web application
+│       ├── templates/
+│       │   └── dashboard.html
+│       └── static/
+│           └── style.css
 ├── scripts/
 │   ├── download_model.py
 │   ├── capture_training_images.py
 │   ├── train_classifier.py
 │   └── calibrate_bowls.py
 ├── models/                   # Trained models stored here
+├── sounds/                   # Sound files for deterrent
 ├── data/
 │   └── training/            # Training images
 └── logs/                    # Event logs

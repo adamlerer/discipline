@@ -46,6 +46,20 @@ spray:
   cooldown_s: 10  # Minimum seconds between sprays
   enabled: true  # Set to false to disable spraying (test mode)
 
+# Sound deterrent settings
+sound:
+  file: "sounds/deterrent.mp3"  # Path to sound file (MP3 or WAV)
+  volume: 0.7  # Volume level (0.0 to 1.0)
+  duration_ms: 2000  # Maximum playback duration in milliseconds
+  cooldown_s: 5  # Minimum seconds between plays
+  enabled: false  # Set to true to enable sound deterrent
+
+# Web admin interface
+web:
+  enabled: true  # Set to true to enable web interface
+  host: "0.0.0.0"  # Host to bind to (0.0.0.0 for all interfaces)
+  port: 5000  # Port number for web interface
+
 # Bowl monitoring logic
 monitoring:
   # How long a cat must be at a bowl to be considered "eating"
@@ -61,6 +75,13 @@ logging:
   file: "logs/discipline.log"
   max_size_mb: 10
   backup_count: 5
+
+# Labeling settings - auto-capture cat images for training data
+labeling:
+  enabled: true
+  capture_interval_s: 1.0  # Minimum time between captures
+  max_unlabeled: 500  # Maximum unlabeled images to keep
+  min_detection_confidence: 0.6  # Minimum detection confidence to capture
 
 # Debug settings
 debug:

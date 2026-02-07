@@ -21,6 +21,8 @@ python-dotenv>=1.0.0
 # Logging and monitoring
 loguru>=0.7.0
 
-# Optional: Web dashboard
-# flask>=3.0.0
-# flask-socketio>=5.3.0
+# Web dashboard
+flask>=3.0.0
+
+# Audio playback for sound deterrent
+pygame>=2.5.0

@@ -160,3 +160,27 @@ class DisciplineLogger:
             "Discipline system shutting down",
             **stats,
         )
+
+    def log_sound(self, cat_name: str, bowl_name: str, duration_ms: int) -> None:
+        """Log a sound playback event."""
+        self.info(
+            "SOUND ACTIVATED",
+            target_cat=cat_name,
+            bowl=bowl_name,
+            duration_ms=duration_ms,
+        )
+
+    def log_deterrent_toggle(
+        self,
+        deterrent_type: str,
+        enabled: bool,
+        source: str = "web",
+    ) -> None:
+        """Log when a deterrent mode is toggled."""
+        action = "enabled" if enabled else "disabled"
+        self.info(
+            f"Deterrent {action}",
+            type=deterrent_type,
+            enabled=enabled,
+            source=source,
+        )
