@@ -1,0 +1,252 @@
+"""
+Flask web application for the Discipline admin interface.
+
+Provides live video streaming, status monitoring, and deterrent controls.
+"""
+
+import threading
+import time
+from typing import TYPE_CHECKING, Generator, Optional
+
+import cv2
+from flask import Flask, Response, jsonify, render_template, request, send_file
+
+if TYPE_CHECKING:
+    from ..main import DisciplineSystem
+
+
+class DisciplineWebApp:
+    """
+    Web interface for the Discipline cat monitoring system.
+    """
+
+    def __init__(
+        self,
+        system: "DisciplineSystem",
+        host: str = "0.0.0.0",
+        port: int = 5000,
+    ):
+        """
+        Initialize the web application.
+
+        Args:
+            system: Reference to the main DisciplineSystem
+            host: Host to bind to
+            port: Port to listen on
+        """
+        self.system = system
+        self.host = host
+        self.port = port
+
+        self._app = Flask(
+            __name__,
+            template_folder="templates",
+            static_folder="static",
+        )
+        self._setup_routes()
+
+        self._server_thread: Optional[threading.Thread] = None
+        self._running = False
+
+    def _setup_routes(self) -> None:
+        """Set up Flask routes."""
+
+        @self._app.route("/")
+        def index():
+            """Serve the admin dashboard."""
+            return render_template("dashboard.html")
+
+        @self._app.route("/video_feed")
+        def video_feed():
+            """MJPEG video stream with overlays."""
+            return Response(
+                self._generate_frames(),
+                mimetype="multipart/x-mixed-replace; boundary=frame",
+            )
+
+        @self._app.route("/api/status")
+        def api_status():
+            """Get system status."""
+            return jsonify(self.system.get_system_status())
+
+        @self._app.route("/api/spray/toggle", methods=["POST"])
+        def api_spray_toggle():
+            """Toggle spray on/off."""
+            data = request.get_json() or {}
+            enabled = data.get("enabled")
+
+            if enabled is None:
+                # Toggle current state
+                enabled = not self.system.get_spray_enabled()
+
+            self.system.set_spray_enabled(enabled)
+            return jsonify({
+                "success": True,
+                "spray_enabled": enabled,
+            })
+
+        @self._app.route("/api/sound/toggle", methods=["POST"])
+        def api_sound_toggle():
+            """Toggle sound on/off."""
+            data = request.get_json() or {}
+            enabled = data.get("enabled")
+
+            if enabled is None:
+                # Toggle current state
+                enabled = not self.system.get_sound_enabled()
+
+            self.system.set_sound_enabled(enabled)
+            return jsonify({
+                "success": True,
+                "sound_enabled": enabled,
+            })
+
+        @self._app.route("/api/test/spray", methods=["POST"])
+        def api_test_spray():
+            """Test spray (bypasses cooldown)."""
+            if self.system.sprayer:
+                success = self.system.sprayer.test_spray()
+                return jsonify({
+                    "success": success,
+                    "message": "Spray test triggered" if success else "Spray busy",
+                })
+            return jsonify({
+                "success": False,
+                "message": "Sprayer not available",
+            })
+
+        @self._app.route("/api/test/sound", methods=["POST"])
+        def api_test_sound():
+            """Test sound (bypasses cooldown)."""
+            if self.system.sound_player:
+                success = self.system.sound_player.test_play()
+                return jsonify({
+                    "success": success,
+                    "message": "Sound test triggered" if success else "Sound busy",
+                })
+            return jsonify({
+                "success": False,
+                "message": "Sound player not available",
+            })
+
+        @self._app.route("/api/events")
+        def api_events():
+            """Get recent events."""
+            limit = request.args.get("limit", 50, type=int)
+            events = self.system.get_recent_events(limit)
+            return jsonify(events)
+
+        # Labeling API endpoints
+        @self._app.route("/api/labeling/images")
+        def api_labeling_images():
+            """Get list of unlabeled images."""
+            images = self.system.get_unlabeled_images()
+            return jsonify(images)
+
+        @self._app.route("/api/labeling/image/<filename>")
+        def api_labeling_image(filename: str):
+            """Serve an unlabeled image file."""
+            filepath = self.system.get_unlabeled_image_path(filename)
+            if filepath is None:
+                return jsonify({"error": "Image not found"}), 404
+            return send_file(filepath, mimetype="image/jpeg")
+
+        @self._app.route("/api/labeling/label", methods=["POST"])
+        def api_labeling_label():
+            """Label an image and move to training folder."""
+            data = request.get_json() or {}
+            filename = data.get("filename")
+            cat_name = data.get("cat_name")
+
+            if not filename or not cat_name:
+                return jsonify({
+                    "success": False,
+                    "error": "Missing filename or cat_name",
+                }), 400
+
+            if cat_name not in ("abbi", "ilana"):
+                return jsonify({
+                    "success": False,
+                    "error": "Invalid cat_name (must be 'abbi' or 'ilana')",
+                }), 400
+
+            success = self.system.label_image(filename, cat_name)
+            return jsonify({
+                "success": success,
+                "message": f"Labeled as {cat_name}" if success else "Image not found",
+            })
+
+        @self._app.route("/api/labeling/skip", methods=["POST"])
+        def api_labeling_skip():
+            """Skip (delete) an unlabeled image."""
+            data = request.get_json() or {}
+            filename = data.get("filename")
+
+            if not filename:
+                return jsonify({
+                    "success": False,
+                    "error": "Missing filename",
+                }), 400
+
+            success = self.system.skip_image(filename)
+            return jsonify({
+                "success": success,
+                "message": "Image skipped" if success else "Image not found",
+            })
+
+        @self._app.route("/api/labeling/stats")
+        def api_labeling_stats():
+            """Get labeling statistics."""
+            stats = self.system.get_labeling_stats()
+            return jsonify(stats)
+
+    def _generate_frames(self) -> Generator[bytes, None, None]:
+        """Generate MJPEG frames for video streaming."""
+        while self._running and self.system._running:
+            frame = self.system.get_annotated_frame()
+
+            if frame is not None:
+                # Encode frame as JPEG
+                _, buffer = cv2.imencode(
+                    ".jpg",
+                    frame,
+                    [cv2.IMWRITE_JPEG_QUALITY, 70],
+                )
+                frame_bytes = buffer.tobytes()
+
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
+                )
+
+            # Control frame rate
+            time.sleep(0.033)  # ~30 FPS
+
+    def start(self) -> None:
+        """Start the web server in a background thread."""
+        if self._running:
+            return
+
+        self._running = True
+        self._server_thread = threading.Thread(
+            target=self._run_server,
+            daemon=True,
+        )
+        self._server_thread.start()
+
+    def _run_server(self) -> None:
+        """Run the Flask server (in background thread)."""
+        # Disable Flask's reloader and debugger for production
+        self._app.run(
+            host=self.host,
+            port=self.port,
+            debug=False,
+            use_reloader=False,
+            threaded=True,
+        )
+
+    def stop(self) -> None:
+        """Stop the web server."""
+        self._running = False
+        # Note: Flask's development server doesn't have a clean shutdown
+        # In production, use a proper WSGI server like gunicorn

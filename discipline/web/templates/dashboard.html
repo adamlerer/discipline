@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discipline - Cat Food Bowl Guardian</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Discipline</h1>
+            <p class="subtitle">Cat Food Bowl Guardian</p>
+        </header>
+
+        <main>
+            <section class="video-panel">
+                <h2>Live View</h2>
+                <div class="video-container">
+                    <img id="video-stream" src="/video_feed" alt="Live camera feed">
+                </div>
+            </section>
+
+            <section class="controls-panel">
+                <h2>Deterrent Controls</h2>
+
+                <div class="control-group">
+                    <div class="control-item">
+                        <span class="control-label">Water Spray</span>
+                        <div class="control-buttons">
+                            <button id="spray-toggle" class="toggle-btn" onclick="toggleSpray()">
+                                <span class="status-indicator"></span>
+                                <span class="toggle-text">Loading...</span>
+                            </button>
+                            <button class="test-btn" onclick="testSpray()">Test</button>
+                        </div>
+                    </div>
+
+                    <div class="control-item">
+                        <span class="control-label">Sound</span>
+                        <div class="control-buttons">
+                            <button id="sound-toggle" class="toggle-btn" onclick="toggleSound()">
+                                <span class="status-indicator"></span>
+                                <span class="toggle-text">Loading...</span>
+                            </button>
+                            <button class="test-btn" onclick="testSound()">Test</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="status-panel">
+                <h2>System Status</h2>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <span class="status-label">Status</span>
+                        <span id="system-status" class="status-value">--</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Runtime</span>
+                        <span id="runtime" class="status-value">--</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Frames</span>
+                        <span id="frames" class="status-value">--</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Violations</span>
+                        <span id="violations" class="status-value">--</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Sprays</span>
+                        <span id="spray-count" class="status-value">--</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Sounds</span>
+                        <span id="sound-count" class="status-value">--</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="labeling-panel">
+                <h2>Training Data Labeling</h2>
+                <div class="labeling-stats">
+                    <span>Unlabeled: <strong id="unlabeled-count">0</strong></span>
+                    <span>Abbi: <strong id="abbi-count">0</strong></span>
+                    <span>Ilana: <strong id="ilana-count">0</strong></span>
+                </div>
+                <div class="labeling-container">
+                    <div id="labeling-empty" class="labeling-empty">
+                        <p>No unlabeled images</p>
+                        <p class="hint">Images will appear here as cats are detected</p>
+                    </div>
+                    <div id="labeling-content" class="labeling-content" style="display: none;">
+                        <div class="labeling-image-container">
+                            <img id="labeling-image" src="" alt="Cat to label">
+                            <div class="image-counter">
+                                <span id="current-image-index">1</span> / <span id="total-images">1</span>
+                            </div>
+                        </div>
+                        <div class="labeling-buttons">
+                            <button class="label-btn abbi-btn" onclick="labelImage('abbi')">
+                                <span class="key-hint">A</span> Abbi
+                            </button>
+                            <button class="label-btn ilana-btn" onclick="labelImage('ilana')">
+                                <span class="key-hint">I</span> Ilana
+                            </button>
+                            <button class="label-btn skip-btn" onclick="skipImage()">
+                                <span class="key-hint">S</span> Skip
+                            </button>
+                        </div>
+                        <div class="labeling-nav">
+                            <button class="nav-btn" onclick="prevImage()">
+                                <span class="key-hint">&larr;</span> Previous
+                            </button>
+                            <button class="nav-btn" onclick="nextImage()">
+                                Next <span class="key-hint">&rarr;</span>
+                            </button>
+                        </div>
+                        <p class="keyboard-hint">Keyboard: A=Abbi, I=Ilana, S=Skip, Arrow keys to navigate</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="events-panel">
+                <h2>Recent Events</h2>
+                <div id="events-list" class="events-list">
+                    <p class="loading">Loading events...</p>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Discipline Cat Monitoring System</p>
+        </footer>
+    </div>
+
+    <script>
+        // State
+        let sprayEnabled = false;
+        let soundEnabled = false;
+
+        // Labeling state
+        let unlabeledImages = [];
+        let currentImageIndex = 0;
+
+        // Update status every 2 seconds
+        setInterval(updateStatus, 2000);
+        // Update events every 5 seconds
+        setInterval(updateEvents, 5000);
+        // Update labeling images every 3 seconds
+        setInterval(updateLabelingImages, 3000);
+
+        // Initial load
+        updateStatus();
+        updateEvents();
+        updateLabelingStats();
+        updateLabelingImages();
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ignore if typing in an input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+            switch(e.key.toLowerCase()) {
+                case 'a':
+                    labelImage('abbi');
+                    break;
+                case 'i':
+                    labelImage('ilana');
+                    break;
+                case 's':
+                    skipImage();
+                    break;
+                case 'arrowleft':
+                    prevImage();
+                    break;
+                case 'arrowright':
+                    nextImage();
+                    break;
+            }
+        });
+
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+
+                // Update system status
+                document.getElementById('system-status').textContent =
+                    data.running ? 'Running' : 'Stopped';
+                document.getElementById('system-status').className =
+                    'status-value ' + (data.running ? 'running' : 'stopped');
+
+                document.getElementById('runtime').textContent =
+                    formatDuration(data.runtime_s);
+                document.getElementById('frames').textContent =
+                    data.frames_processed.toLocaleString();
+                document.getElementById('violations').textContent =
+                    data.violations_detected;
+
+                // Update deterrent stats
+                const sprayStats = data.deterrents.spray.stats;
+                const soundStats = data.deterrents.sound.stats;
+
+                document.getElementById('spray-count').textContent =
+                    sprayStats.spray_count || 0;
+                document.getElementById('sound-count').textContent =
+                    soundStats.play_count || 0;
+
+                // Update toggle buttons
+                sprayEnabled = data.deterrents.spray.enabled;
+                soundEnabled = data.deterrents.sound.enabled;
+
+                updateToggleButton('spray-toggle', sprayEnabled);
+                updateToggleButton('sound-toggle', soundEnabled, !data.deterrents.sound.available);
+
+            } catch (error) {
+                console.error('Failed to fetch status:', error);
+            }
+        }
+
+        async function updateEvents() {
+            try {
+                const response = await fetch('/api/events?limit=20');
+                const events = await response.json();
+
+                const container = document.getElementById('events-list');
+
+                if (events.length === 0) {
+                    container.innerHTML = '<p class="no-events">No events yet</p>';
+                    return;
+                }
+
+                container.innerHTML = events.map(event => {
+                    const time = new Date(event.timestamp).toLocaleTimeString();
+
+                    if (event.type === 'violation') {
+                        let actions = [];
+                        if (event.sprayed) actions.push('sprayed');
+                        if (event.sounded) actions.push('sounded');
+                        const actionText = actions.length > 0
+                            ? ` - ${actions.join(', ')}`
+                            : ' - no action';
+
+                        return `<div class="event violation">
+                            <span class="event-time">${time}</span>
+                            <span class="event-icon">&#9888;</span>
+                            <span class="event-text">
+                                <strong>${event.cat}</strong> at <strong>${event.bowl}</strong>'s bowl${actionText}
+                            </span>
+                        </div>`;
+                    } else if (event.type === 'toggle') {
+                        const state = event.enabled ? 'enabled' : 'disabled';
+                        return `<div class="event toggle">
+                            <span class="event-time">${time}</span>
+                            <span class="event-icon">&#9881;</span>
+                            <span class="event-text">
+                                ${event.deterrent} ${state}
+                            </span>
+                        </div>`;
+                    }
+                    return '';
+                }).join('');
+
+            } catch (error) {
+                console.error('Failed to fetch events:', error);
+            }
+        }
+
+        function updateToggleButton(id, enabled, disabled = false) {
+            const btn = document.getElementById(id);
+            const text = btn.querySelector('.toggle-text');
+
+            btn.classList.toggle('enabled', enabled);
+            btn.classList.toggle('disabled-btn', disabled);
+            text.textContent = disabled ? 'N/A' : (enabled ? 'ON' : 'OFF');
+            btn.disabled = disabled;
+        }
+
+        async function toggleSpray() {
+            try {
+                const response = await fetch('/api/spray/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: !sprayEnabled })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    sprayEnabled = data.spray_enabled;
+                    updateToggleButton('spray-toggle', sprayEnabled);
+                }
+            } catch (error) {
+                console.error('Failed to toggle spray:', error);
+            }
+        }
+
+        async function toggleSound() {
+            try {
+                const response = await fetch('/api/sound/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: !soundEnabled })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    soundEnabled = data.sound_enabled;
+                    updateToggleButton('sound-toggle', soundEnabled);
+                }
+            } catch (error) {
+                console.error('Failed to toggle sound:', error);
+            }
+        }
+
+        async function testSpray() {
+            try {
+                const response = await fetch('/api/test/spray', { method: 'POST' });
+                const data = await response.json();
+                showToast(data.message);
+            } catch (error) {
+                showToast('Failed to test spray');
+            }
+        }
+
+        async function testSound() {
+            try {
+                const response = await fetch('/api/test/sound', { method: 'POST' });
+                const data = await response.json();
+                showToast(data.message);
+            } catch (error) {
+                showToast('Failed to test sound');
+            }
+        }
+
+        function formatDuration(seconds) {
+            const hrs = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+
+            if (hrs > 0) {
+                return `${hrs}h ${mins}m`;
+            } else if (mins > 0) {
+                return `${mins}m ${secs}s`;
+            } else {
+                return `${secs}s`;
+            }
+        }
+
+        function showToast(message) {
+            // Simple toast notification
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 2000);
+        }
+
+        // Labeling functions
+        async function updateLabelingStats() {
+            try {
+                const response = await fetch('/api/labeling/stats');
+                const stats = await response.json();
+
+                document.getElementById('unlabeled-count').textContent = stats.unlabeled;
+                document.getElementById('abbi-count').textContent = stats.abbi;
+                document.getElementById('ilana-count').textContent = stats.ilana;
+            } catch (error) {
+                console.error('Failed to fetch labeling stats:', error);
+            }
+        }
+
+        async function updateLabelingImages() {
+            try {
+                const response = await fetch('/api/labeling/images');
+                const images = await response.json();
+
+                const wasEmpty = unlabeledImages.length === 0;
+                const currentFilename = unlabeledImages[currentImageIndex]?.filename;
+
+                unlabeledImages = images;
+
+                // Try to maintain position on same image if it still exists
+                if (currentFilename) {
+                    const newIndex = images.findIndex(img => img.filename === currentFilename);
+                    if (newIndex >= 0) {
+                        currentImageIndex = newIndex;
+                    } else if (currentImageIndex >= images.length) {
+                        currentImageIndex = Math.max(0, images.length - 1);
+                    }
+                }
+
+                updateLabelingUI();
+                updateLabelingStats();
+            } catch (error) {
+                console.error('Failed to fetch labeling images:', error);
+            }
+        }
+
+        function updateLabelingUI() {
+            const emptyEl = document.getElementById('labeling-empty');
+            const contentEl = document.getElementById('labeling-content');
+            const imageEl = document.getElementById('labeling-image');
+            const indexEl = document.getElementById('current-image-index');
+            const totalEl = document.getElementById('total-images');
+
+            if (unlabeledImages.length === 0) {
+                emptyEl.style.display = 'block';
+                contentEl.style.display = 'none';
+                return;
+            }
+
+            emptyEl.style.display = 'none';
+            contentEl.style.display = 'block';
+
+            const currentImage = unlabeledImages[currentImageIndex];
+            if (currentImage) {
+                imageEl.src = `/api/labeling/image/${currentImage.filename}`;
+                indexEl.textContent = currentImageIndex + 1;
+                totalEl.textContent = unlabeledImages.length;
+            }
+        }
+
+        async function labelImage(catName) {
+            if (unlabeledImages.length === 0) return;
+
+            const currentImage = unlabeledImages[currentImageIndex];
+            if (!currentImage) return;
+
+            try {
+                const response = await fetch('/api/labeling/label', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filename: currentImage.filename,
+                        cat_name: catName
+                    })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast(`Labeled as ${catName}`);
+                    // Remove from local list and refresh
+                    unlabeledImages.splice(currentImageIndex, 1);
+                    if (currentImageIndex >= unlabeledImages.length) {
+                        currentImageIndex = Math.max(0, unlabeledImages.length - 1);
+                    }
+                    updateLabelingUI();
+                    updateLabelingStats();
+                } else {
+                    showToast(data.message || 'Failed to label');
+                }
+            } catch (error) {
+                showToast('Failed to label image');
+                console.error('Failed to label image:', error);
+            }
+        }
+
+        async function skipImage() {
+            if (unlabeledImages.length === 0) return;
+
+            const currentImage = unlabeledImages[currentImageIndex];
+            if (!currentImage) return;
+
+            try {
+                const response = await fetch('/api/labeling/skip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename: currentImage.filename })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('Image skipped');
+                    // Remove from local list and refresh
+                    unlabeledImages.splice(currentImageIndex, 1);
+                    if (currentImageIndex >= unlabeledImages.length) {
+                        currentImageIndex = Math.max(0, unlabeledImages.length - 1);
+                    }
+                    updateLabelingUI();
+                    updateLabelingStats();
+                } else {
+                    showToast(data.message || 'Failed to skip');
+                }
+            } catch (error) {
+                showToast('Failed to skip image');
+                console.error('Failed to skip image:', error);
+            }
+        }
+
+        function prevImage() {
+            if (unlabeledImages.length === 0) return;
+            currentImageIndex = (currentImageIndex - 1 + unlabeledImages.length) % unlabeledImages.length;
+            updateLabelingUI();
+        }
+
+        function nextImage() {
+            if (unlabeledImages.length === 0) return;
+            currentImageIndex = (currentImageIndex + 1) % unlabeledImages.length;
+            updateLabelingUI();
+        }
+    </script>
+</body>
+</html>
