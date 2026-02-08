@@ -126,7 +126,7 @@
                                 <span class="key-hint">I</span> Ilana
                             </button>
                             <button class="label-btn skip-btn" onclick="skipImage()">
-                                <span class="key-hint">S</span> Skip
+                                <span class="key-hint">D</span> Delete
                             </button>
                         </div>
                         <div class="labeling-nav">
@@ -137,7 +137,7 @@
                                 Next <span class="key-hint">&rarr;</span>
                             </button>
                         </div>
-                        <p class="keyboard-hint">Keyboard: A=Abbi, I=Ilana, S=Skip, Arrow keys to navigate</p>
+                        <p class="keyboard-hint">Keyboard: A=Abbi, I=Ilana, D=Delete, Arrow keys to navigate</p>
                     </div>
                 </div>
             </section>
@@ -153,8 +153,11 @@
                         <input type="checkbox" id="select-all-labeled" onchange="toggleSelectAllLabeled(this.checked)">
                         Select All
                     </label>
+                    <button class="swap-btn" onclick="swapSelectedLabeled()" id="swap-labeled-btn" disabled>
+                        Swap to <span id="swap-target">Ilana</span> (<span id="selected-count">0</span>)
+                    </button>
                     <button class="delete-btn" onclick="deleteSelectedLabeled()" id="delete-labeled-btn" disabled>
-                        Delete Selected (<span id="selected-count">0</span>)
+                        Delete Selected
                     </button>
                 </div>
                 <div id="labeled-grid" class="labeled-grid">
@@ -219,7 +222,7 @@
                 case 'i':
                     labelImage('ilana');
                     break;
-                case 's':
+                case 'd':
                     skipImage();
                     break;
                 case 'arrowleft':
@@ -884,6 +887,41 @@
             const count = selectedLabeled.size;
             document.getElementById('selected-count').textContent = count;
             document.getElementById('delete-labeled-btn').disabled = count === 0;
+            document.getElementById('swap-labeled-btn').disabled = count === 0;
+
+            // Update swap target label
+            const swapTarget = currentLabeledTab === 'abbi' ? 'Ilana' : 'Abbi';
+            document.getElementById('swap-target').textContent = swapTarget;
+        }
+
+        async function swapSelectedLabeled() {
+            if (selectedLabeled.size === 0) return;
+
+            const newCat = currentLabeledTab === 'abbi' ? 'ilana' : 'abbi';
+            const count = selectedLabeled.size;
+
+            try {
+                let swapped = 0;
+                for (const key of selectedLabeled) {
+                    const [cat, filename] = key.split('/');
+                    const response = await fetch('/api/labeling/swap', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ cat, filename })
+                    });
+                    const data = await response.json();
+                    if (data.success) swapped++;
+                }
+
+                showToast(`Moved ${swapped} image(s) to ${newCat}`);
+                selectedLabeled.clear();
+                document.getElementById('select-all-labeled').checked = false;
+                loadLabeledImages();
+                updateLabelingStats();
+            } catch (error) {
+                showToast('Failed to swap images');
+                console.error('Swap error:', error);
+            }
         }
 
         async function deleteSelectedLabeled() {

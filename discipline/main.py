@@ -697,6 +697,34 @@ class DisciplineSystem:
             return filepath.resolve()
         return None
 
+    def swap_image_label(self, cat_name: str, filename: str) -> bool:
+        """
+        Swap an image's label from one cat to the other.
+
+        Args:
+            cat_name: Current cat ("abbi" or "ilana")
+            filename: Name of the image file
+
+        Returns:
+            True if successful
+        """
+        if cat_name not in ("abbi", "ilana"):
+            return False
+
+        new_cat = "ilana" if cat_name == "abbi" else "abbi"
+
+        source = self._training_dir / cat_name / filename
+        if not source.exists():
+            return False
+
+        dest_dir = self._training_dir / new_cat
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / filename
+
+        source.rename(dest)
+        self.logger.info(f"Swapped image {filename} from {cat_name} to {new_cat}")
+        return True
+
     def delete_labeled_images(self, images: list) -> dict:
         """
         Delete multiple labeled images.

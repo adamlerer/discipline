@@ -220,6 +220,28 @@ class DisciplineWebApp:
                 return jsonify({"error": "Image not found"}), 404
             return send_file(filepath, mimetype="image/jpeg")
 
+        @self._app.route("/api/labeling/swap", methods=["POST"])
+        def api_swap_label():
+            """Swap an image's label to the other cat."""
+            data = request.get_json() or {}
+            cat_name = data.get("cat")
+            filename = data.get("filename")
+
+            if not cat_name or not filename:
+                return jsonify({
+                    "success": False,
+                    "error": "Missing cat or filename",
+                }), 400
+
+            success = self.system.swap_image_label(cat_name, filename)
+            new_cat = "ilana" if cat_name == "abbi" else "abbi"
+
+            return jsonify({
+                "success": success,
+                "message": f"Moved to {new_cat}" if success else "Failed to swap",
+                "new_cat": new_cat if success else None,
+            })
+
         @self._app.route("/api/labeling/delete", methods=["POST"])
         def api_delete_labeled():
             """Delete multiple labeled images."""
