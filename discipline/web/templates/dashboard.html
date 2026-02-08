@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Discipline - Cat Food Bowl Guardian</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐱</text></svg>">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -56,6 +57,10 @@
                                 <span class="toggle-text">Loading...</span>
                             </button>
                             <button class="test-btn" onclick="testSound()">Test</button>
+                            <label class="upload-btn">
+                                Upload
+                                <input type="file" id="sound-upload" accept=".wav,.mp3,.ogg" onchange="uploadSound(this)" hidden>
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -351,6 +356,26 @@
             }
         }
 
+        async function uploadSound(input) {
+            if (!input.files || !input.files[0]) return;
+
+            const formData = new FormData();
+            formData.append('file', input.files[0]);
+
+            try {
+                const response = await fetch('/api/sound/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                showToast(data.message || data.error);
+                input.value = ''; // Reset input
+            } catch (error) {
+                showToast('Failed to upload sound');
+                console.error('Upload error:', error);
+            }
+        }
+
         function formatDuration(seconds) {
             const hrs = Math.floor(seconds / 3600);
             const mins = Math.floor((seconds % 3600) / 60);
@@ -594,17 +619,10 @@
         function toggleBowlEdit(enabled) {
             bowlEditMode = enabled;
             document.getElementById('bowl-edit-hint').style.display = enabled ? 'inline' : 'none';
-            document.getElementById('video-stream').style.display = enabled ? 'none' : 'block';
 
-            // When in edit mode, show a static frame instead of video stream
-            if (enabled) {
-                // Capture current frame as static image
-                const video = document.getElementById('video-stream');
-                video.style.display = 'none';
-            } else {
-                const video = document.getElementById('video-stream');
-                video.style.display = 'block';
-            }
+            // Keep video visible, overlay editable circles on top
+            const overlay = document.getElementById('bowl-overlay');
+            overlay.style.pointerEvents = enabled ? 'auto' : 'none';
 
             renderBowlOverlay();
         }

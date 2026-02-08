@@ -93,9 +93,10 @@ class DisciplineSystem:
         self._min_detection_confidence = labeling_cfg.get("min_detection_confidence", 0.6)
         self._last_capture_time = 0.0
 
-        # Data directories for labeling
-        self._unlabeled_dir = Path("data/unlabeled")
-        self._training_dir = Path("data/training")
+        # Data directories for labeling (relative to config file location)
+        project_root = self.config_path.parent
+        self._unlabeled_dir = project_root / "data" / "unlabeled"
+        self._training_dir = project_root / "data" / "training"
 
     def _load_config(self) -> dict:
         """Load configuration from YAML file."""
@@ -428,24 +429,7 @@ class DisciplineSystem:
         # Convert to BGR for OpenCV
         annotated = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
-        # Draw bowl zones
-        if self.monitor:
-            for bowl_name, bowl in self.monitor.bowls.items():
-                color = (0, 255, 0) if bowl_name == "abbi" else (255, 0, 0)
-                cv2.circle(annotated, (bowl.x, bowl.y), bowl.radius, color, 2)
-                label = f"{bowl_name.upper()} BOWL"
-                # Center the label above the bowl
-                text_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
-                text_x = bowl.x - text_size[0] // 2
-                cv2.putText(
-                    annotated,
-                    label,
-                    (text_x, bowl.y - bowl.radius - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    color,
-                    2,
-                )
+        # Note: Bowl zones are drawn via SVG overlay in the web UI
 
         # Draw bounding boxes for detected cats
         for detection, identification in detections:

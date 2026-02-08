@@ -265,6 +265,22 @@ section h2 {
     border-color: var(--accent);
 }
 
+.upload-btn {
+    padding: 10px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.upload-btn:hover {
+    background-color: var(--bg-lighter);
+    border-color: var(--accent);
+}
+
 /* Status Panel */
 .status-panel {
     grid-column: 2 / 3;

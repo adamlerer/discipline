@@ -9,7 +9,11 @@ import time
 from typing import TYPE_CHECKING, Generator, Optional
 
 import cv2
+import os
+from pathlib import Path
+
 from flask import Flask, Response, jsonify, render_template, request, send_file
+from werkzeug.utils import secure_filename
 
 if TYPE_CHECKING:
     from ..main import DisciplineSystem
@@ -206,6 +210,53 @@ class DisciplineWebApp:
             """Get bowl positions."""
             bowls = self.system.get_bowl_positions()
             return jsonify(bowls)
+
+        @self._app.route("/api/sound/upload", methods=["POST"])
+        def api_sound_upload():
+            """Upload a custom sound file."""
+            if 'file' not in request.files:
+                return jsonify({
+                    "success": False,
+                    "error": "No file provided",
+                }), 400
+
+            file = request.files['file']
+            if file.filename == '':
+                return jsonify({
+                    "success": False,
+                    "error": "No file selected",
+                }), 400
+
+            # Check file extension
+            allowed_extensions = {'.wav', '.mp3', '.ogg'}
+            ext = os.path.splitext(file.filename)[1].lower()
+            if ext not in allowed_extensions:
+                return jsonify({
+                    "success": False,
+                    "error": f"Invalid file type. Allowed: {', '.join(allowed_extensions)}",
+                }), 400
+
+            # Save to sounds directory
+            sounds_dir = Path(self.system.config_path).parent / "sounds"
+            sounds_dir.mkdir(exist_ok=True)
+
+            filename = secure_filename(file.filename)
+            filepath = sounds_dir / filename
+            file.save(filepath)
+
+            # Update config to use new sound
+            self.system.config["sound"]["file"] = f"sounds/{filename}"
+            self.system._save_config()
+
+            # Reinitialize sound player if exists
+            if self.system.sound_player:
+                self.system.sound_player.sound_file = filepath
+
+            return jsonify({
+                "success": True,
+                "message": f"Uploaded {filename}",
+                "filename": filename,
+            })
 
         @self._app.route("/api/bowls/<bowl_name>", methods=["POST"])
         def api_update_bowl(bowl_name: str):
