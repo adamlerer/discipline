@@ -93,8 +93,8 @@ class DisciplineSystem:
         self._min_detection_confidence = labeling_cfg.get("min_detection_confidence", 0.6)
         self._last_capture_time = 0.0
 
-        # Data directories for labeling (relative to config file location)
-        project_root = self.config_path.parent
+        # Data directories for labeling (absolute paths based on config file location)
+        project_root = self.config_path.parent.resolve()
         self._unlabeled_dir = project_root / "data" / "unlabeled"
         self._training_dir = project_root / "data" / "training"
 
@@ -674,11 +674,11 @@ class DisciplineSystem:
             filename: Name of the image file
 
         Returns:
-            Path to the image or None if not found
+            Absolute path to the image or None if not found
         """
         filepath = self._unlabeled_dir / filename
         if filepath.exists():
-            return filepath
+            return filepath.resolve()  # Return absolute path
         return None
 
     def _show_debug_frame(self, frame: np.ndarray) -> None:
