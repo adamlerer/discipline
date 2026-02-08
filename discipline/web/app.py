@@ -204,6 +204,41 @@ class DisciplineWebApp:
             stats = self.system.get_labeling_stats()
             return jsonify(stats)
 
+        @self._app.route("/api/labeling/labeled/<cat_name>")
+        def api_labeled_images(cat_name: str):
+            """Get list of labeled images for a cat."""
+            if cat_name not in ("abbi", "ilana"):
+                return jsonify({"error": "Invalid cat name"}), 400
+            images = self.system.get_labeled_images(cat_name)
+            return jsonify(images)
+
+        @self._app.route("/api/labeling/labeled/<cat_name>/<filename>")
+        def api_labeled_image(cat_name: str, filename: str):
+            """Serve a labeled image file."""
+            filepath = self.system.get_labeled_image_path(cat_name, filename)
+            if filepath is None:
+                return jsonify({"error": "Image not found"}), 404
+            return send_file(filepath, mimetype="image/jpeg")
+
+        @self._app.route("/api/labeling/delete", methods=["POST"])
+        def api_delete_labeled():
+            """Delete multiple labeled images."""
+            data = request.get_json() or {}
+            images = data.get("images", [])
+
+            if not images:
+                return jsonify({
+                    "success": False,
+                    "error": "No images specified",
+                }), 400
+
+            result = self.system.delete_labeled_images(images)
+            return jsonify({
+                "success": True,
+                "deleted": result["deleted"],
+                "errors": result["errors"],
+            })
+
         # Bowl configuration endpoints
         @self._app.route("/api/bowls")
         def api_bowls():

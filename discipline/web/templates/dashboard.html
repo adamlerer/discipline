@@ -49,16 +49,19 @@
                         </div>
                     </div>
 
-                    <div class="control-item">
-                        <span class="control-label">Sound</span>
+                    <div class="control-item sound-control">
+                        <div class="control-label-group">
+                            <span class="control-label">Sound</span>
+                            <span class="sound-file-info" id="sound-file-info">Loading...</span>
+                        </div>
                         <div class="control-buttons">
                             <button id="sound-toggle" class="toggle-btn" onclick="toggleSound()">
                                 <span class="status-indicator"></span>
                                 <span class="toggle-text">Loading...</span>
                             </button>
                             <button class="test-btn" onclick="testSound()">Test</button>
-                            <label class="upload-btn">
-                                Upload
+                            <label class="upload-btn" title="Upload .wav, .mp3, or .ogg file">
+                                Upload (.wav/.mp3/.ogg)
                                 <input type="file" id="sound-upload" accept=".wav,.mp3,.ogg" onchange="uploadSound(this)" hidden>
                             </label>
                         </div>
@@ -139,6 +142,26 @@
                 </div>
             </section>
 
+            <section class="labeled-panel">
+                <h2>Labeled Training Images</h2>
+                <div class="labeled-tabs">
+                    <button class="tab-btn active" onclick="showLabeledTab('abbi')">Abbi (<span id="abbi-labeled-count">0</span>)</button>
+                    <button class="tab-btn" onclick="showLabeledTab('ilana')">Ilana (<span id="ilana-labeled-count">0</span>)</button>
+                </div>
+                <div class="labeled-actions">
+                    <label class="select-all-label">
+                        <input type="checkbox" id="select-all-labeled" onchange="toggleSelectAllLabeled(this.checked)">
+                        Select All
+                    </label>
+                    <button class="delete-btn" onclick="deleteSelectedLabeled()" id="delete-labeled-btn" disabled>
+                        Delete Selected (<span id="selected-count">0</span>)
+                    </button>
+                </div>
+                <div id="labeled-grid" class="labeled-grid">
+                    <p class="no-images">No labeled images yet</p>
+                </div>
+            </section>
+
             <section class="events-panel">
                 <h2>Recent Events</h2>
                 <div id="events-list" class="events-list">
@@ -165,7 +188,10 @@
         let bowlEditMode = false;
         let bowls = {};
         let draggingBowl = null;
+        let resizingBowl = null;
         let dragOffset = { x: 0, y: 0 };
+        let resizeStartRadius = 0;
+        let resizeStartX = 0;
 
         // Update status every 2 seconds
         setInterval(updateStatus, 2000);
@@ -231,6 +257,14 @@
                     sprayStats.spray_count || 0;
                 document.getElementById('sound-count').textContent =
                     soundStats.play_count || 0;
+
+                // Update sound file info
+                if (soundStats.sound_file) {
+                    const filename = soundStats.sound_file.split('/').pop();
+                    document.getElementById('sound-file-info').textContent = filename;
+                } else {
+                    document.getElementById('sound-file-info').textContent = 'No file';
+                }
 
                 // Update toggle buttons
                 sprayEnabled = data.deterrents.spray.enabled;
@@ -608,11 +642,28 @@
                 group.appendChild(text);
                 overlay.appendChild(group);
 
-                // Add event listeners for editing
+                // Add resize handle circle
                 if (bowlEditMode) {
-                    group.addEventListener('mousedown', (e) => startDragBowl(e, name));
-                    group.addEventListener('wheel', (e) => resizeBowl(e, name));
+                    const handle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    handle.setAttribute('cx', scaledX + scaledRadius);
+                    handle.setAttribute('cy', scaledY);
+                    handle.setAttribute('r', 8);
+                    handle.classList.add('resize-handle');
+                    handle.classList.add(name === 'abbi' ? 'abbi' : 'ilana');
+                    group.appendChild(handle);
+
+                    // Drag to move the bowl
+                    circle.addEventListener('mousedown', (e) => startDragBowl(e, name));
+                    text.addEventListener('mousedown', (e) => startDragBowl(e, name));
+
+                    // Drag handle to resize
+                    handle.addEventListener('mousedown', (e) => startResizeBowl(e, name));
                 }
+
+                // Scroll to resize (works anywhere on the bowl)
+                group.addEventListener('wheel', (e) => {
+                    if (bowlEditMode) resizeBowl(e, name);
+                }, { passive: false });
             }
         }
 
@@ -674,12 +725,49 @@
         function resizeBowl(e, bowlName) {
             if (!bowlEditMode) return;
             e.preventDefault();
+            e.stopPropagation();
 
             const delta = e.deltaY > 0 ? -10 : 10;
             bowls[bowlName].radius = Math.max(20, Math.min(300, bowls[bowlName].radius + delta));
 
             renderBowlOverlay();
             saveBowlPosition(bowlName);
+        }
+
+        function startResizeBowl(e, bowlName) {
+            if (!bowlEditMode) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            resizingBowl = bowlName;
+            resizeStartRadius = bowls[bowlName].radius;
+            resizeStartX = e.clientX;
+
+            document.addEventListener('mousemove', dragResizeBowl);
+            document.addEventListener('mouseup', stopResizeBowl);
+        }
+
+        function dragResizeBowl(e) {
+            if (!resizingBowl) return;
+
+            const overlay = document.getElementById('bowl-overlay');
+            const rect = overlay.getBoundingClientRect();
+            const scale = Math.min(rect.width / 1280, rect.height / 720);
+
+            const deltaX = e.clientX - resizeStartX;
+            const newRadius = Math.round(resizeStartRadius + deltaX / scale);
+
+            bowls[resizingBowl].radius = Math.max(20, Math.min(300, newRadius));
+            renderBowlOverlay();
+        }
+
+        function stopResizeBowl() {
+            if (resizingBowl) {
+                saveBowlPosition(resizingBowl);
+                resizingBowl = null;
+            }
+            document.removeEventListener('mousemove', dragResizeBowl);
+            document.removeEventListener('mouseup', stopResizeBowl);
         }
 
         async function saveBowlPosition(bowlName) {
@@ -708,6 +796,130 @@
         window.addEventListener('resize', () => {
             renderBowlOverlay();
         });
+
+        // Labeled images state
+        let currentLabeledTab = 'abbi';
+        let labeledImages = { abbi: [], ilana: [] };
+        let selectedLabeled = new Set();
+
+        // Load labeled images on startup
+        loadLabeledImages();
+
+        async function loadLabeledImages() {
+            try {
+                const [abbiRes, ilanaRes] = await Promise.all([
+                    fetch('/api/labeling/labeled/abbi'),
+                    fetch('/api/labeling/labeled/ilana')
+                ]);
+                labeledImages.abbi = await abbiRes.json();
+                labeledImages.ilana = await ilanaRes.json();
+
+                document.getElementById('abbi-labeled-count').textContent = labeledImages.abbi.length;
+                document.getElementById('ilana-labeled-count').textContent = labeledImages.ilana.length;
+
+                renderLabeledGrid();
+            } catch (error) {
+                console.error('Failed to load labeled images:', error);
+            }
+        }
+
+        function showLabeledTab(cat) {
+            currentLabeledTab = cat;
+            selectedLabeled.clear();
+            updateSelectedCount();
+
+            // Update tab buttons
+            document.querySelectorAll('.labeled-tabs .tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase().startsWith(cat));
+            });
+
+            document.getElementById('select-all-labeled').checked = false;
+            renderLabeledGrid();
+        }
+
+        function renderLabeledGrid() {
+            const grid = document.getElementById('labeled-grid');
+            const images = labeledImages[currentLabeledTab];
+
+            if (images.length === 0) {
+                grid.innerHTML = '<p class="no-images">No labeled images for ' + currentLabeledTab + '</p>';
+                return;
+            }
+
+            grid.innerHTML = images.map(img => `
+                <div class="labeled-item" data-cat="${img.cat}" data-filename="${img.filename}">
+                    <input type="checkbox" class="labeled-checkbox"
+                           onchange="toggleLabeledSelection('${img.cat}', '${img.filename}', this.checked)"
+                           ${selectedLabeled.has(img.cat + '/' + img.filename) ? 'checked' : ''}>
+                    <img src="/api/labeling/labeled/${img.cat}/${img.filename}" alt="${img.filename}">
+                </div>
+            `).join('');
+        }
+
+        function toggleLabeledSelection(cat, filename, checked) {
+            const key = cat + '/' + filename;
+            if (checked) {
+                selectedLabeled.add(key);
+            } else {
+                selectedLabeled.delete(key);
+            }
+            updateSelectedCount();
+        }
+
+        function toggleSelectAllLabeled(checked) {
+            const images = labeledImages[currentLabeledTab];
+            selectedLabeled.clear();
+
+            if (checked) {
+                images.forEach(img => {
+                    selectedLabeled.add(img.cat + '/' + img.filename);
+                });
+            }
+
+            renderLabeledGrid();
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            const count = selectedLabeled.size;
+            document.getElementById('selected-count').textContent = count;
+            document.getElementById('delete-labeled-btn').disabled = count === 0;
+        }
+
+        async function deleteSelectedLabeled() {
+            if (selectedLabeled.size === 0) return;
+
+            const images = Array.from(selectedLabeled).map(key => {
+                const [cat, filename] = key.split('/');
+                return { cat, filename };
+            });
+
+            if (!confirm(`Delete ${images.length} image(s)? This cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/labeling/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ images })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast(`Deleted ${data.deleted} image(s)`);
+                    selectedLabeled.clear();
+                    document.getElementById('select-all-labeled').checked = false;
+                    loadLabeledImages();
+                    updateLabelingStats();
+                } else {
+                    showToast(data.error || 'Failed to delete');
+                }
+            } catch (error) {
+                showToast('Failed to delete images');
+                console.error('Delete error:', error);
+            }
+        }
     </script>
 </body>
 </html>

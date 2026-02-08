@@ -151,6 +151,26 @@ section h2 {
     text-shadow: 0 0 4px black, 0 0 4px black;
 }
 
+.resize-handle {
+    fill: white;
+    stroke-width: 2;
+    cursor: ew-resize;
+    opacity: 0.8;
+}
+
+.resize-handle.abbi {
+    stroke: #22c55e;
+}
+
+.resize-handle.ilana {
+    stroke: #3b82f6;
+}
+
+.resize-handle:hover {
+    opacity: 1;
+    transform: scale(1.2);
+}
+
 .bowl-controls {
     display: flex;
     align-items: center;
@@ -202,6 +222,22 @@ section h2 {
 .control-label {
     font-weight: 500;
     font-size: 1.1rem;
+}
+
+.control-label-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sound-file-info {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-family: monospace;
+}
+
+.sound-control {
+    flex-wrap: wrap;
 }
 
 .control-buttons {
@@ -487,6 +523,127 @@ section h2 {
     color: var(--text-secondary);
     text-align: center;
     margin-top: 5px;
+}
+
+/* Labeled Images Panel */
+.labeled-panel {
+    grid-column: 1 / 3;
+}
+
+.labeled-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.tab-btn {
+    padding: 8px 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+    background-color: var(--bg-lighter);
+}
+
+.tab-btn.active {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.labeled-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+    padding: 10px 15px;
+    background-color: var(--bg-lighter);
+    border-radius: 8px;
+}
+
+.select-all-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.select-all-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.delete-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    background-color: #dc2626;
+    color: white;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.delete-btn:hover:not(:disabled) {
+    background-color: #b91c1c;
+}
+
+.delete-btn:disabled {
+    background-color: #6b7280;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.labeled-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 5px;
+}
+
+.labeled-item {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: #000;
+}
+
+.labeled-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.labeled-checkbox {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    z-index: 1;
+}
+
+.labeled-item:hover {
+    outline: 2px solid var(--accent);
+}
+
+.no-images {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 30px;
 }
 
 /* Events Panel */

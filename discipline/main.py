@@ -648,6 +648,89 @@ class DisciplineSystem:
         self.logger.debug(f"Skipped image: {filename}")
         return True
 
+    def get_labeled_images(self, cat_name: str) -> list:
+        """
+        Get list of labeled images for a specific cat.
+
+        Args:
+            cat_name: "abbi" or "ilana"
+
+        Returns:
+            List of dicts with filename and timestamp
+        """
+        cat_dir = self._training_dir / cat_name
+        if not cat_dir.exists():
+            return []
+
+        images = []
+        for filepath in sorted(
+            cat_dir.glob("*.jpg"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        ):
+            stat = filepath.stat()
+            images.append({
+                "filename": filepath.name,
+                "cat": cat_name,
+                "timestamp": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "size": stat.st_size,
+            })
+
+        return images
+
+    def get_labeled_image_path(self, cat_name: str, filename: str) -> Optional[Path]:
+        """
+        Get the full path to a labeled image.
+
+        Args:
+            cat_name: "abbi" or "ilana"
+            filename: Name of the image file
+
+        Returns:
+            Absolute path to the image or None if not found
+        """
+        if cat_name not in ("abbi", "ilana"):
+            return None
+
+        filepath = self._training_dir / cat_name / filename
+        if filepath.exists():
+            return filepath.resolve()
+        return None
+
+    def delete_labeled_images(self, images: list) -> dict:
+        """
+        Delete multiple labeled images.
+
+        Args:
+            images: List of {"cat": "abbi"/"ilana", "filename": "..."}
+
+        Returns:
+            Dict with deleted count and any errors
+        """
+        deleted = 0
+        errors = []
+
+        for img in images:
+            cat_name = img.get("cat")
+            filename = img.get("filename")
+
+            if cat_name not in ("abbi", "ilana"):
+                errors.append(f"Invalid cat: {cat_name}")
+                continue
+
+            filepath = self._training_dir / cat_name / filename
+            if filepath.exists():
+                try:
+                    filepath.unlink()
+                    deleted += 1
+                    self.logger.info(f"Deleted labeled image: {cat_name}/{filename}")
+                except Exception as e:
+                    errors.append(f"Failed to delete {filename}: {e}")
+            else:
+                errors.append(f"Not found: {cat_name}/{filename}")
+
+        return {"deleted": deleted, "errors": errors}
+
     def get_labeling_stats(self) -> dict:
         """
         Get counts of unlabeled and labeled images.
