@@ -315,6 +315,28 @@ class DisciplineWebApp:
                 "filename": filename,
             })
 
+        @self._app.route("/api/sound/file")
+        def api_sound_file():
+            """Serve the current sound file for preview."""
+            sound_path = self.system.config.get("sound", {}).get("file")
+            if not sound_path:
+                return jsonify({"error": "No sound file configured"}), 404
+
+            filepath = Path(self.system.config_path).parent / sound_path
+            if not filepath.exists():
+                return jsonify({"error": "Sound file not found"}), 404
+
+            # Determine mimetype based on extension
+            ext = filepath.suffix.lower()
+            mimetypes = {
+                ".wav": "audio/wav",
+                ".mp3": "audio/mpeg",
+                ".ogg": "audio/ogg",
+            }
+            mimetype = mimetypes.get(ext, "audio/wav")
+
+            return send_file(filepath, mimetype=mimetype)
+
         @self._app.route("/api/bowls/<bowl_name>", methods=["POST"])
         def api_update_bowl(bowl_name: str):
             """Update a bowl's position."""

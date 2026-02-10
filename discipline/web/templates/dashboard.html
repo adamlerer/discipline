@@ -59,12 +59,14 @@
                                 <span class="status-indicator"></span>
                                 <span class="toggle-text">Loading...</span>
                             </button>
-                            <button class="test-btn" onclick="testSound()">Test</button>
+                            <button class="test-btn" onclick="testSound()">Test (Pi)</button>
+                            <button class="preview-btn" onclick="previewSound()">Preview (Local)</button>
                             <label class="upload-btn" title="Upload .wav, .mp3, or .ogg file">
                                 Upload (.wav/.mp3/.ogg)
                                 <input type="file" id="sound-upload" accept=".wav,.mp3,.ogg" onchange="uploadSound(this)" hidden>
                             </label>
                         </div>
+                        <audio id="sound-preview" style="display: none;"></audio>
                     </div>
                 </div>
             </section>
@@ -411,6 +413,16 @@
                 showToast('Failed to upload sound');
                 console.error('Upload error:', error);
             }
+        }
+
+        function previewSound() {
+            const audio = document.getElementById('sound-preview');
+            // Add timestamp to bust cache when file changes
+            audio.src = '/api/sound/file?t=' + Date.now();
+            audio.play().catch(error => {
+                showToast('Failed to play sound');
+                console.error('Preview error:', error);
+            });
         }
 
         function formatDuration(seconds) {
