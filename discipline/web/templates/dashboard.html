@@ -68,7 +68,7 @@
                         </div>
                         <div class="browser-alert-toggle">
                             <label class="alert-toggle-label">
-                                <input type="checkbox" id="browser-alert-toggle" onchange="toggleBrowserAlert(this.checked)">
+                                <input type="checkbox" id="browser-alert-toggle" onchange="toggleBrowserAlert(this.checked)" checked>
                                 <span>Play sound in browser on violation</span>
                             </label>
                         </div>
@@ -190,7 +190,7 @@
         // State
         let sprayEnabled = false;
         let soundEnabled = false;
-        let browserAlertEnabled = false;
+        let browserAlertEnabled = true;
         let lastViolationCount = 0;
 
         // Labeling state
