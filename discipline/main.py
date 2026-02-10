@@ -606,10 +606,10 @@ class DisciplineSystem:
 
     def get_unlabeled_images(self) -> list:
         """
-        Get list of unlabeled images with metadata.
+        Get list of unlabeled images with metadata and classifier predictions.
 
         Returns:
-            List of dicts with filename and timestamp
+            List of dicts with filename, timestamp, and predicted cat
         """
         if not self._unlabeled_dir.exists():
             return []
@@ -621,11 +621,27 @@ class DisciplineSystem:
             reverse=True,  # Most recent first
         ):
             stat = filepath.stat()
-            images.append({
+            image_data = {
                 "filename": filepath.name,
                 "timestamp": datetime.fromtimestamp(stat.st_mtime).isoformat(),
                 "size": stat.st_size,
-            })
+                "prediction": None,
+                "confidence": None,
+            }
+
+            # Run classifier if available
+            if self.identifier and self.identifier.is_trained:
+                try:
+                    img = cv2.imread(str(filepath))
+                    if img is not None:
+                        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                        result = self.identifier.identify(img_rgb)
+                        image_data["prediction"] = result.cat_name
+                        image_data["confidence"] = round(result.confidence, 2)
+                except Exception:
+                    pass  # Skip prediction on error
+
+            images.append(image_data)
 
         return images
 

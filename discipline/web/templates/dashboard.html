@@ -126,6 +126,9 @@
                                 <span id="current-image-index">1</span> / <span id="total-images">1</span>
                             </div>
                         </div>
+                        <div class="classifier-prediction" id="classifier-prediction">
+                            Classifier: <span id="prediction-text">--</span>
+                        </div>
                         <div class="labeling-buttons">
                             <button class="label-btn abbi-btn" onclick="labelImage('abbi')">
                                 <span class="key-hint">A</span> Abbi
@@ -547,6 +550,17 @@
                 imageEl.src = `/api/labeling/image/${currentImage.filename}`;
                 indexEl.textContent = currentImageIndex + 1;
                 totalEl.textContent = unlabeledImages.length;
+
+                // Update classifier prediction
+                const predictionEl = document.getElementById('prediction-text');
+                if (currentImage.prediction) {
+                    const conf = Math.round(currentImage.confidence * 100);
+                    predictionEl.textContent = `${currentImage.prediction} (${conf}%)`;
+                    predictionEl.className = currentImage.prediction === 'abbi' ? 'prediction-abbi' : 'prediction-ilana';
+                } else {
+                    predictionEl.textContent = 'No prediction';
+                    predictionEl.className = '';
+                }
             }
         }
 

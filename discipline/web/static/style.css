@@ -472,6 +472,25 @@ section h2 {
     font-size: 0.85rem;
 }
 
+.classifier-prediction {
+    text-align: center;
+    font-size: 1.1rem;
+    padding: 8px 16px;
+    background-color: var(--bg-lighter);
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+
+.prediction-abbi {
+    color: #22c55e;
+    font-weight: bold;
+}
+
+.prediction-ilana {
+    color: #3b82f6;
+    font-weight: bold;
+}
+
 .labeling-buttons {
     display: flex;
     gap: 15px;
