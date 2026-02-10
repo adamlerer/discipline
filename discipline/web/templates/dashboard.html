@@ -174,9 +174,6 @@
                     <button class="action-btn label-ilana-btn" onclick="labelSelectedAs('ilana')" id="label-ilana-btn" disabled>
                         Label as Ilana
                     </button>
-                    <button class="action-btn swap-btn" onclick="swapSelectedLabeled()" id="swap-labeled-btn" disabled>
-                        Swap Label
-                    </button>
                     <button class="action-btn delete-btn" onclick="deleteSelectedLabeled()" id="delete-labeled-btn" disabled>
                         Delete
                     </button>
@@ -986,7 +983,6 @@
             const count = selectedLabeled.size;
             document.getElementById('selected-count').textContent = count;
             document.getElementById('delete-labeled-btn').disabled = count === 0;
-            document.getElementById('swap-labeled-btn').disabled = count === 0 || currentLabeledTab === 'unlabeled';
             document.getElementById('label-abbi-btn').disabled = count === 0 || currentLabeledTab !== 'unlabeled';
             document.getElementById('label-ilana-btn').disabled = count === 0 || currentLabeledTab !== 'unlabeled';
         }
