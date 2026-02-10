@@ -322,7 +322,7 @@ class DisciplineWebApp:
             if not sound_path:
                 return jsonify({"error": "No sound file configured"}), 404
 
-            filepath = Path(self.system.config_path).parent / sound_path
+            filepath = Path(self.system.config_path).resolve().parent / sound_path
             if not filepath.exists():
                 return jsonify({"error": "Sound file not found"}), 404
 

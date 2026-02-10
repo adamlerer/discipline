@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh repo create:*)",
+      "Bash(where gh:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nInitial commit: Discipline cat food bowl guardian system\n\nComplete cat monitoring and discipline system that:\n- Detects cats using YOLOv8\n- Identifies individual cats \\(Abbi vs Ilana\\) using trained classifier\n- Monitors bowl zones and tracks which cat is at which bowl\n- Sprays water when Ilana eats from Abbi''s bowl\n\nIncludes:\n- Camera capture module \\(Raspberry Pi Camera or USB webcam\\)\n- Cat detection using YOLOv8\n- Cat identification using feature-based classifier\n- Bowl zone monitoring with violation detection\n- GPIO-controlled water sprayer\n- Training and calibration scripts\n- Systemd service for production deployment\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git config:*)",
+      "Bash(git push:*)",
+      "WebSearch",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd shopping list with purchase links for hardware components\n\nInclude direct links to Amazon and Adafruit for all required\ncomponents: Raspberry Pi 4, camera module, solenoid valve, relay,\npower supplies, tubing, nozzles, jumper wires, and enclosure.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(python -m py_compile:*)",
+      "Bash(ping:*)",
+      "Bash(ssh:*)",
+      "Bash(where:*)",
+      "Bash([ -f ~/.ssh/id_ed25519 ])",
+      "Bash(ssh-keygen:*)",
+      "Bash(python:*)",
+      "Bash(git commit:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl:*)",
+      "Bash(git reset:*)",
+      "Bash(arp:*)",
+      "Bash(findstr:*)",
+      "Bash(timeout:*)"
+    ]
+  }
+}

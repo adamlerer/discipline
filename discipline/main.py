@@ -73,6 +73,7 @@ class DisciplineSystem:
         # Store current frame and detections for web streaming
         self._current_frame: Optional[np.ndarray] = None
         self._current_detections: list = []
+        self._current_violations: set = set()  # Set of cat names currently in violation
         self._frame_lock = threading.Lock()
 
         # Event log for web interface
@@ -288,20 +289,33 @@ class DisciplineSystem:
                     bowl=bowl_at,
                 )
 
-        # Store current frame and detections for web streaming
-        with self._frame_lock:
-            self._current_frame = frame.copy()
-            self._current_detections = identified.copy()
-
         # Capture images for labeling if enabled
         if self._labeling_enabled and detections:
             self._capture_for_labeling(frame, identified)
 
         if not detections:
+            with self._frame_lock:
+                self._current_frame = frame.copy()
+                self._current_detections = []
+                self._current_violations = set()
             return
 
         # Update bowl monitor and check for violations
         violations = self.monitor.update(identified)
+
+        # Track which cats are currently in violation (at wrong bowl)
+        current_violations = set()
+        for cat_name, track in self.monitor.cat_tracks.items():
+            if track.current_bowl:
+                allowed_bowl = self.monitor.cat_allowed_bowls.get(cat_name)
+                if allowed_bowl and track.current_bowl != allowed_bowl:
+                    current_violations.add(cat_name)
+
+        # Store current frame and detections for web streaming
+        with self._frame_lock:
+            self._current_frame = frame.copy()
+            self._current_detections = identified.copy()
+            self._current_violations = current_violations
 
         # Handle violations
         for violation in violations:
@@ -425,6 +439,7 @@ class DisciplineSystem:
 
             frame = self._current_frame.copy()
             detections = self._current_detections.copy()
+            violations = self._current_violations.copy()
 
         # Convert to BGR for OpenCV
         annotated = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
@@ -434,6 +449,8 @@ class DisciplineSystem:
         # Draw bounding boxes for detected cats
         for detection, identification in detections:
             x1, y1, x2, y2 = detection.bbox
+            is_violation = identification.cat_name in violations
+
             # Color based on cat identity
             if identification.cat_name == "abbi":
                 color = (0, 255, 0)  # Green for Abbi
@@ -442,15 +459,23 @@ class DisciplineSystem:
             else:
                 color = (0, 255, 255)  # Yellow for unknown
 
+            # Draw semi-transparent red fill if in violation
+            if is_violation:
+                overlay = annotated.copy()
+                cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 0, 255), -1)  # Red fill
+                cv2.addWeighted(overlay, 0.3, annotated, 0.7, 0, annotated)
+
             cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
             label = f"{identification.cat_name} ({identification.confidence:.0%})"
+            if is_violation:
+                label = f"VIOLATION: {label}"
             cv2.putText(
                 annotated,
                 label,
                 (x1, y1 - 10),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.6,
-                color,
+                (0, 0, 255) if is_violation else color,
                 2,
             )
 
