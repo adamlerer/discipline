@@ -469,14 +469,23 @@ class DisciplineSystem:
             label = f"{identification.cat_name} ({identification.confidence:.0%})"
             if is_violation:
                 label = f"VIOLATION: {label}"
+
+            # Position label inside box at top (with background for visibility)
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 0.6
+            thickness = 2
+            (text_w, text_h), baseline = cv2.getTextSize(label, font, font_scale, thickness)
+            label_y = y1 + text_h + 5
+            # Draw background rectangle
+            cv2.rectangle(annotated, (x1, y1), (x1 + text_w + 4, label_y + 2), (0, 0, 0), -1)
             cv2.putText(
                 annotated,
                 label,
-                (x1, y1 - 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
+                (x1 + 2, label_y - 2),
+                font,
+                font_scale,
                 (0, 0, 255) if is_violation else color,
-                2,
+                thickness,
             )
 
         return annotated
