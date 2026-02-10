@@ -613,12 +613,15 @@ class DisciplineSystem:
             oldest.unlink()
             self.logger.debug(f"Pruned old unlabeled image: {oldest.name}")
 
-    def get_unlabeled_images(self) -> list:
+    def get_unlabeled_images(self, with_predictions: bool = False) -> list:
         """
-        Get list of unlabeled images with metadata and classifier predictions.
+        Get list of unlabeled images with metadata and optionally classifier predictions.
+
+        Args:
+            with_predictions: If True, run classifier on each image (slower)
 
         Returns:
-            List of dicts with filename, timestamp, and predicted cat
+            List of dicts with filename, timestamp, and optionally predicted cat
         """
         if not self._unlabeled_dir.exists():
             return []
@@ -638,8 +641,8 @@ class DisciplineSystem:
                 "confidence": None,
             }
 
-            # Run classifier if available
-            if self.identifier and self.identifier.is_trained:
+            # Run classifier if available and requested
+            if with_predictions and self.identifier and self.identifier.is_trained:
                 try:
                     img = cv2.imread(str(filepath))
                     if img is not None:

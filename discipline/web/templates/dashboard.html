@@ -872,6 +872,7 @@
 
         async function loadLabeledImages() {
             try {
+                // Load counts first (fast)
                 const [unlabeledRes, abbiRes, ilanaRes] = await Promise.all([
                     fetch('/api/labeling/images'),
                     fetch('/api/labeling/labeled/abbi'),
@@ -886,8 +887,25 @@
                 document.getElementById('ilana-labeled-count').textContent = labeledImages.ilana.length;
 
                 renderLabeledGrid();
+
+                // Load predictions for unlabeled images in background
+                if (labeledImages.unlabeled.length > 0) {
+                    loadUnlabeledPredictions();
+                }
             } catch (error) {
                 console.error('Failed to load labeled images:', error);
+            }
+        }
+
+        async function loadUnlabeledPredictions() {
+            try {
+                const response = await fetch('/api/labeling/images?predictions=true');
+                labeledImages.unlabeled = await response.json();
+                if (currentLabeledTab === 'unlabeled') {
+                    renderLabeledGrid();
+                }
+            } catch (error) {
+                console.error('Failed to load predictions:', error);
             }
         }
 

@@ -144,7 +144,8 @@ class DisciplineWebApp:
         @self._app.route("/api/labeling/images")
         def api_labeling_images():
             """Get list of unlabeled images."""
-            images = self.system.get_unlabeled_images()
+            with_predictions = request.args.get("predictions", "false").lower() == "true"
+            images = self.system.get_unlabeled_images(with_predictions=with_predictions)
             return jsonify(images)
 
         @self._app.route("/api/labeling/image/<filename>")
