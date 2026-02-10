@@ -66,6 +66,12 @@
                                 <input type="file" id="sound-upload" accept=".wav,.mp3,.ogg" onchange="uploadSound(this)" hidden>
                             </label>
                         </div>
+                        <div class="browser-alert-toggle">
+                            <label class="alert-toggle-label">
+                                <input type="checkbox" id="browser-alert-toggle" onchange="toggleBrowserAlert(this.checked)">
+                                <span>Play sound in browser on violation</span>
+                            </label>
+                        </div>
                         <audio id="sound-preview" style="display: none;"></audio>
                     </div>
                 </div>
@@ -184,6 +190,8 @@
         // State
         let sprayEnabled = false;
         let soundEnabled = false;
+        let browserAlertEnabled = false;
+        let lastViolationCount = 0;
 
         // Labeling state
         let unlabeledImages = [];
@@ -253,6 +261,12 @@
                     data.frames_processed.toLocaleString();
                 document.getElementById('violations').textContent =
                     data.violations_detected;
+
+                // Check for new violations and play browser alert
+                if (browserAlertEnabled && data.violations_detected > lastViolationCount && lastViolationCount > 0) {
+                    playBrowserAlert();
+                }
+                lastViolationCount = data.violations_detected;
 
                 // Update deterrent stats
                 const sprayStats = data.deterrents.spray.stats;
@@ -422,6 +436,21 @@
             audio.play().catch(error => {
                 showToast('Failed to play sound');
                 console.error('Preview error:', error);
+            });
+        }
+
+        function toggleBrowserAlert(enabled) {
+            browserAlertEnabled = enabled;
+            if (enabled) {
+                showToast('Browser alerts enabled');
+            }
+        }
+
+        function playBrowserAlert() {
+            const audio = document.getElementById('sound-preview');
+            audio.src = '/api/sound/file?t=' + Date.now();
+            audio.play().catch(error => {
+                console.error('Browser alert error:', error);
             });
         }
 
