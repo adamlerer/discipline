@@ -112,6 +112,28 @@ Water Flow:
                                                             [Aimed at Abbi's bowl]
 ```
 
+## Quick Start (Adam's Setup)
+
+**Web Interface:** http://192.168.86.36:5000
+
+**Start the service:**
+```bash
+ssh alerer@192.168.86.36
+cd ~/discipline && source venv/bin/activate && nohup python3 -m discipline.main --no-spray > /tmp/discipline.log 2>&1 &
+```
+
+**Check logs:**
+```bash
+ssh alerer@192.168.86.36 "tail -f /tmp/discipline.log"
+```
+
+**Stop the service:**
+```bash
+ssh alerer@192.168.86.36 "pkill -f 'python3 -m discipline.main'"
+```
+
+---
+
 ## Software Setup
 
 ### 1. Raspberry Pi OS Setup
@@ -138,8 +160,8 @@ sudo apt install -y python3-pip python3-venv libcamera-apps python3-libcamera py
 git clone https://github.com/adamlerer/discipline.git
 cd discipline
 
-# Create virtual environment
-python3 -m venv venv
+# Create virtual environment (--system-site-packages required for picamera2)
+python3 -m venv --system-site-packages venv
 source venv/bin/activate
 
 # Install Python dependencies
@@ -301,7 +323,7 @@ discipline/
 ### Camera not detected
 ```bash
 # Check camera connection
-libcamera-hello --list-cameras
+rpicam-hello --list-cameras
 ```
 
 ### Relay not triggering
