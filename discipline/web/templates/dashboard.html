@@ -154,25 +154,35 @@
             </section>
 
             <section class="labeled-panel">
-                <h2>Labeled Training Images</h2>
+                <h2>Training Images</h2>
                 <div class="labeled-tabs">
-                    <button class="tab-btn active" onclick="showLabeledTab('abbi')">Abbi (<span id="abbi-labeled-count">0</span>)</button>
-                    <button class="tab-btn" onclick="showLabeledTab('ilana')">Ilana (<span id="ilana-labeled-count">0</span>)</button>
+                    <button class="tab-btn" id="tab-unlabeled" onclick="showLabeledTab('unlabeled')">Unlabeled (<span id="unlabeled-tab-count">0</span>)</button>
+                    <button class="tab-btn active" id="tab-abbi" onclick="showLabeledTab('abbi')">Abbi (<span id="abbi-labeled-count">0</span>)</button>
+                    <button class="tab-btn" id="tab-ilana" onclick="showLabeledTab('ilana')">Ilana (<span id="ilana-labeled-count">0</span>)</button>
                 </div>
                 <div class="labeled-actions">
-                    <label class="select-all-label">
-                        <input type="checkbox" id="select-all-labeled" onchange="toggleSelectAllLabeled(this.checked)">
-                        Select All
-                    </label>
-                    <button class="swap-btn" onclick="swapSelectedLabeled()" id="swap-labeled-btn" disabled>
-                        Swap to <span id="swap-target">Ilana</span> (<span id="selected-count">0</span>)
+                    <button class="select-btn" onclick="selectAllImages()">Select All</button>
+                    <button class="select-btn select-abbi" onclick="selectByPrediction('abbi')">Select Abbi</button>
+                    <button class="select-btn select-ilana" onclick="selectByPrediction('ilana')">Select Ilana</button>
+                    <button class="select-btn" onclick="clearSelection()">Clear</button>
+                </div>
+                <div class="labeled-actions" id="action-buttons">
+                    <span class="selection-count"><span id="selected-count">0</span> selected</span>
+                    <button class="action-btn label-abbi-btn" onclick="labelSelectedAs('abbi')" id="label-abbi-btn" disabled>
+                        Label as Abbi
                     </button>
-                    <button class="delete-btn" onclick="deleteSelectedLabeled()" id="delete-labeled-btn" disabled>
-                        Delete Selected
+                    <button class="action-btn label-ilana-btn" onclick="labelSelectedAs('ilana')" id="label-ilana-btn" disabled>
+                        Label as Ilana
+                    </button>
+                    <button class="action-btn swap-btn" onclick="swapSelectedLabeled()" id="swap-labeled-btn" disabled>
+                        Swap Label
+                    </button>
+                    <button class="action-btn delete-btn" onclick="deleteSelectedLabeled()" id="delete-labeled-btn" disabled>
+                        Delete
                     </button>
                 </div>
                 <div id="labeled-grid" class="labeled-grid">
-                    <p class="no-images">No labeled images yet</p>
+                    <p class="no-images">No images</p>
                 </div>
             </section>
 
@@ -857,7 +867,7 @@
 
         // Labeled images state
         let currentLabeledTab = 'abbi';
-        let labeledImages = { abbi: [], ilana: [] };
+        let labeledImages = { unlabeled: [], abbi: [], ilana: [] };
         let selectedLabeled = new Set();
 
         // Load labeled images on startup
@@ -865,13 +875,16 @@
 
         async function loadLabeledImages() {
             try {
-                const [abbiRes, ilanaRes] = await Promise.all([
+                const [unlabeledRes, abbiRes, ilanaRes] = await Promise.all([
+                    fetch('/api/labeling/images'),
                     fetch('/api/labeling/labeled/abbi'),
                     fetch('/api/labeling/labeled/ilana')
                 ]);
+                labeledImages.unlabeled = await unlabeledRes.json();
                 labeledImages.abbi = await abbiRes.json();
                 labeledImages.ilana = await ilanaRes.json();
 
+                document.getElementById('unlabeled-tab-count').textContent = labeledImages.unlabeled.length;
                 document.getElementById('abbi-labeled-count').textContent = labeledImages.abbi.length;
                 document.getElementById('ilana-labeled-count').textContent = labeledImages.ilana.length;
 
@@ -881,17 +894,17 @@
             }
         }
 
-        function showLabeledTab(cat) {
-            currentLabeledTab = cat;
+        function showLabeledTab(tab) {
+            currentLabeledTab = tab;
             selectedLabeled.clear();
             updateSelectedCount();
 
             // Update tab buttons
             document.querySelectorAll('.labeled-tabs .tab-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.textContent.toLowerCase().startsWith(cat));
+                btn.classList.remove('active');
             });
+            document.getElementById('tab-' + tab).classList.add('active');
 
-            document.getElementById('select-all-labeled').checked = false;
             renderLabeledGrid();
         }
 
@@ -899,54 +912,108 @@
             const grid = document.getElementById('labeled-grid');
             const images = labeledImages[currentLabeledTab];
 
-            if (images.length === 0) {
-                grid.innerHTML = '<p class="no-images">No labeled images for ' + currentLabeledTab + '</p>';
+            if (!images || images.length === 0) {
+                grid.innerHTML = '<p class="no-images">No images</p>';
                 return;
             }
 
-            grid.innerHTML = images.map(img => `
-                <div class="labeled-item" data-cat="${img.cat}" data-filename="${img.filename}">
-                    <input type="checkbox" class="labeled-checkbox"
-                           onchange="toggleLabeledSelection('${img.cat}', '${img.filename}', this.checked)"
-                           ${selectedLabeled.has(img.cat + '/' + img.filename) ? 'checked' : ''}>
-                    <img src="/api/labeling/labeled/${img.cat}/${img.filename}" alt="${img.filename}">
-                </div>
-            `).join('');
-        }
-
-        function toggleLabeledSelection(cat, filename, checked) {
-            const key = cat + '/' + filename;
-            if (checked) {
-                selectedLabeled.add(key);
+            if (currentLabeledTab === 'unlabeled') {
+                grid.innerHTML = images.map(img => {
+                    const key = 'unlabeled/' + img.filename;
+                    const isSelected = selectedLabeled.has(key);
+                    const pred = img.prediction ? `${img.prediction} (${Math.round(img.confidence * 100)}%)` : '';
+                    const predClass = img.prediction === 'abbi' ? 'pred-abbi' : (img.prediction === 'ilana' ? 'pred-ilana' : '');
+                    return `
+                        <div class="labeled-item ${isSelected ? 'selected' : ''}" onclick="toggleImageSelection('unlabeled', '${img.filename}')">
+                            <img src="/api/labeling/image/${img.filename}" alt="${img.filename}">
+                            ${pred ? `<span class="prediction-label ${predClass}">${pred}</span>` : ''}
+                        </div>
+                    `;
+                }).join('');
             } else {
-                selectedLabeled.delete(key);
+                grid.innerHTML = images.map(img => {
+                    const key = img.cat + '/' + img.filename;
+                    const isSelected = selectedLabeled.has(key);
+                    return `
+                        <div class="labeled-item ${isSelected ? 'selected' : ''}" onclick="toggleImageSelection('${img.cat}', '${img.filename}')">
+                            <img src="/api/labeling/labeled/${img.cat}/${img.filename}" alt="${img.filename}">
+                        </div>
+                    `;
+                }).join('');
             }
-            updateSelectedCount();
         }
 
-        function toggleSelectAllLabeled(checked) {
-            const images = labeledImages[currentLabeledTab];
-            selectedLabeled.clear();
-
-            if (checked) {
-                images.forEach(img => {
-                    selectedLabeled.add(img.cat + '/' + img.filename);
-                });
+        function toggleImageSelection(cat, filename) {
+            const key = cat + '/' + filename;
+            if (selectedLabeled.has(key)) {
+                selectedLabeled.delete(key);
+            } else {
+                selectedLabeled.add(key);
             }
-
-            renderLabeledGrid();
             updateSelectedCount();
+            renderLabeledGrid();
+        }
+
+        function selectAllImages() {
+            const images = labeledImages[currentLabeledTab];
+            images.forEach(img => {
+                const cat = currentLabeledTab === 'unlabeled' ? 'unlabeled' : img.cat;
+                selectedLabeled.add(cat + '/' + img.filename);
+            });
+            updateSelectedCount();
+            renderLabeledGrid();
+        }
+
+        function selectByPrediction(prediction) {
+            const images = labeledImages[currentLabeledTab];
+            images.forEach(img => {
+                if (img.prediction === prediction) {
+                    const cat = currentLabeledTab === 'unlabeled' ? 'unlabeled' : img.cat;
+                    selectedLabeled.add(cat + '/' + img.filename);
+                }
+            });
+            updateSelectedCount();
+            renderLabeledGrid();
+        }
+
+        function clearSelection() {
+            selectedLabeled.clear();
+            updateSelectedCount();
+            renderLabeledGrid();
         }
 
         function updateSelectedCount() {
             const count = selectedLabeled.size;
             document.getElementById('selected-count').textContent = count;
             document.getElementById('delete-labeled-btn').disabled = count === 0;
-            document.getElementById('swap-labeled-btn').disabled = count === 0;
+            document.getElementById('swap-labeled-btn').disabled = count === 0 || currentLabeledTab === 'unlabeled';
+            document.getElementById('label-abbi-btn').disabled = count === 0 || currentLabeledTab !== 'unlabeled';
+            document.getElementById('label-ilana-btn').disabled = count === 0 || currentLabeledTab !== 'unlabeled';
+        }
 
-            // Update swap target label
-            const swapTarget = currentLabeledTab === 'abbi' ? 'Ilana' : 'Abbi';
-            document.getElementById('swap-target').textContent = swapTarget;
+        async function labelSelectedAs(catName) {
+            if (selectedLabeled.size === 0 || currentLabeledTab !== 'unlabeled') return;
+
+            let labeled = 0;
+            for (const key of selectedLabeled) {
+                const [, filename] = key.split('/');
+                try {
+                    const response = await fetch('/api/labeling/label', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ filename, cat_name: catName })
+                    });
+                    const data = await response.json();
+                    if (data.success) labeled++;
+                } catch (error) {
+                    console.error('Failed to label:', error);
+                }
+            }
+
+            showToast(`Labeled ${labeled} image(s) as ${catName}`);
+            selectedLabeled.clear();
+            loadLabeledImages();
+            updateLabelingStats();
         }
 
         async function swapSelectedLabeled() {
